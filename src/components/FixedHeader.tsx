@@ -1,6 +1,6 @@
 import React from 'react';
 import {StyleSheet, View} from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import LinearGradient from './LinearGradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 // Height of the header row content (avatar / title / search button).
