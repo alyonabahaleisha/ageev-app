@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Required for JDK 17+ compatibility with prefab (uses JNA / System::load)
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} --enable-native-access=ALL-UNNAMED"
+
 #
 # Copyright © 2015 the original authors.
 #

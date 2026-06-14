@@ -66,6 +66,10 @@ yarn-error.log
 # testing
 /coverage
 
+# Scratch / accidental nested copies
+/tmp/
+/Users/
+
 # Yarn
 .yarn/*
 !.yarn/patches

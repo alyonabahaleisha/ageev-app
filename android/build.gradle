@@ -19,3 +19,20 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+subprojects {
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        kotlinOptions { jvmTarget = "17" }
+    }
+}
+
+gradle.afterProject { proj ->
+    if (proj.plugins.hasPlugin("com.android.library") || proj.plugins.hasPlugin("com.android.application")) {
+        try {
+            proj.android.compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+        } catch (ignored) {}
+    }
+}
