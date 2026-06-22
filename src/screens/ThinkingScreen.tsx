@@ -1,7 +1,7 @@
 import React, {useEffect, useRef} from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
-  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,6 +13,12 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_SEARCH} from '../assets/icons';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {RemoteImage} from '../components/RemoteImage';
+import {
+  hasStateContent,
+  MindsetState,
+  useMindsetStates,
+} from '../services/mindsetStates';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -24,42 +30,30 @@ const CARD_RADIUS = 20;
 const BTN_SIZE = 47;
 const BTN_RADIUS = 23.5;
 
-const STATES = [
-  {
-    label: 'Любовь Творца',
-    image: require('../assets/images/state-love-420040.png'),
-  },
-  {
-    label: 'Я ценен',
-    image: require('../assets/images/state-valuable-153c70.png'),
-  },
-  {
-    label: 'Изобилие',
-    image: require('../assets/images/state-abundance-2ffa7d.png'),
-  },
-  {
-    label: 'Доверие жизни',
-    image: require('../assets/images/state-trust-6b8bae.png'),
-  },
-  {
-    label: 'Спокойствие',
-    image: require('../assets/images/state-calm-47757d.png'),
-  },
-  {
-    label: 'Поддержка ангелов',
-    image: require('../assets/images/state-angels-56deca.png'),
-  },
-];
-
-function StateCard({label, image}: {label: string; image: number}) {
+function StateCard({
+  state,
+  onPress,
+}: {
+  state: MindsetState;
+  onPress: () => void;
+}) {
   return (
-    <TouchableOpacity activeOpacity={0.85} style={styles.cardBlueGlow}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      style={styles.cardBlueGlow}
+      onPress={onPress}>
       <View style={styles.cardShadow}>
         <View style={styles.cardClip}>
-          <Image source={image} style={styles.cardBg} resizeMode="stretch" />
+          {!!state.coverImage && (
+            <RemoteImage
+              source={{uri: state.coverImage}}
+              style={styles.cardBg}
+              resizeMode="cover"
+            />
+          )}
           <View style={styles.cardOverlay} />
           <View style={styles.cardLabelWrap}>
-            <Text style={styles.cardLabel}>{label}</Text>
+            <Text style={styles.cardLabel}>{state.title}</Text>
           </View>
         </View>
       </View>
@@ -67,9 +61,16 @@ function StateCard({label, image}: {label: string; image: number}) {
   );
 }
 
-export function ThinkingScreen({resetSignal = 0}: {resetSignal?: number}) {
+type Props = {
+  resetSignal?: number;
+  onOpenState?: (state: MindsetState) => void;
+};
+
+export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const {states, loading} = useMindsetStates();
+  const visibleStates = states.filter(hasStateContent);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({y: 0, animated: true});
@@ -95,11 +96,21 @@ export function ThinkingScreen({resetSignal = 0}: {resetSignal?: number}) {
           </Text>
         </View>
 
-        <View style={styles.grid}>
-          {STATES.map(s => (
-            <StateCard key={s.label} label={s.label} image={s.image} />
-          ))}
-        </View>
+        {loading ? (
+          <View style={styles.loader}>
+            <ActivityIndicator color={colors.white} />
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {visibleStates.map(s => (
+              <StateCard
+                key={s.id}
+                state={s}
+                onPress={() => onOpenState?.(s)}
+              />
+            ))}
+          </View>
+        )}
       </View>
 
       <View style={{height: bottom + 110}} />
@@ -195,6 +206,10 @@ const styles = StyleSheet.create({
   },
 
   // ── Card grid ─────────────────────────────────────────────────────────────
+  loader: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

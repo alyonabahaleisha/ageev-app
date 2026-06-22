@@ -18,6 +18,8 @@ import {WebinarBlock} from './src/components/WebinarBlock';
 import {SchoolCard} from './src/components/SchoolCard';
 import {ClubSection} from './src/components/ClubSection';
 import {ThinkingScreen} from './src/screens/ThinkingScreen';
+import {StateScreen} from './src/screens/StateScreen';
+import {MindsetState} from './src/services/mindsetStates';
 import {PracticesScreen} from './src/screens/PracticesScreen';
 import {AffirmationsScreen} from './src/screens/AffirmationsScreen';
 import {SchoolScreen} from './src/screens/SchoolScreen';
@@ -57,15 +59,17 @@ function AppContent() {
   const [thinkingReset, setThinkingReset] = useState(0);
   const [practicesReset, setPracticesReset] = useState(0);
   const [showAffirmations, setShowAffirmations] = useState(false);
+  const [selectedState, setSelectedState] = useState<MindsetState | null>(null);
   const [showSchool, setShowSchool] = useState(false);
   const [showClubMap, setShowClubMap] = useState(false);
-  const [showStories, setShowStories] = useState(true);
+  const [showStories, setShowStories] = useState(false);
 
   function handleTabPress(index: number) {
     if (index === activeTab) {
       if (index === 0) {
         homeScrollRef.current?.scrollTo({y: 0, animated: true});
       } else if (index === 1) {
+        setSelectedState(null);
         setThinkingReset(n => n + 1);
       } else if (index === 2) {
         setPracticesReset(n => n + 1);
@@ -123,7 +127,10 @@ function AppContent() {
       <Animated.View
         style={[styles.screenSlot, {opacity: opacity1}]}
         pointerEvents={activeTab !== 1 ? 'none' : 'auto'}>
-        <ThinkingScreen resetSignal={thinkingReset} />
+        <ThinkingScreen
+          resetSignal={thinkingReset}
+          onOpenState={setSelectedState}
+        />
       </Animated.View>
 
       <Animated.View
@@ -139,6 +146,16 @@ function AppContent() {
           <ClubScreen
             onOpenMap={() => setShowClubMap(true)}
             onClose={() => handleTabPress(0)}
+          />
+        </View>
+      )}
+
+      {/* State detail screen — opens from the Мышление tab. */}
+      {activeTab === 1 && selectedState && (
+        <View style={styles.screenSlot}>
+          <StateScreen
+            state={selectedState}
+            onBack={() => setSelectedState(null)}
           />
         </View>
       )}
