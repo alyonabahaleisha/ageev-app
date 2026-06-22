@@ -10,227 +10,223 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ICON_BACK} from '../assets/icons';
-import {GradientBackground} from '../components/GradientBackground';
+import {ICON_SEARCH, ICON_EXPAND, ICON_CLOSE} from '../assets/icons';
+import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import LinearGradient from '../components/LinearGradient';
+import {useClubs} from '../services/clubs';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
 const SECTION_MARGIN = 24;
-const BTN_SIZE = 34;
+const BTN_SIZE = 47;
+const BTN_RADIUS = 23.5;
+const CARD_RADIUS = 20;
 
-type Section = {title: string; body: string};
+// Russian plural for "город" (city): 1 → город, 2–4 → города, else → городов.
+function cityWord(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'город';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'города';
+  return 'городов';
+}
 
-const INTRO =
-  'Школа Михаила Агеева – это пространство практик для работы с внутренним ' +
-  'состоянием и качеством жизни. Здесь человек учится лучше понимать себя и ' +
-  'выстраивать более гармоничное состояние через регулярные практики.';
+type Props = {onOpenMap: () => void; onClose: () => void};
 
-const SECTIONS: Section[] = [
-  {
-    title: 'Философия',
-    body:
-      'В основе школы – идея, что качество жизни начинается с внутреннего ' +
-      'состояния. Развивая осознанность и внимание к себе, человек может ' +
-      'менять своё восприятие, реакции и жизненный путь.',
-  },
-  {
-    title: 'Подход',
-    body:
-      'Обучение строится через практику: медитации, упражнения и работу с ' +
-      'состояниями. Основной фокус – не теория, а личный опыт и постепенное ' +
-      'изменение внутреннего состояния.',
-  },
-  {
-    title: 'Кто такой Михаил',
-    body:
-      'Михаил Агеев – основатель школы и автор системы практик по работе с ' +
-      'состоянием и осознанностью. Более 17 лет он развивает направления ' +
-      'психологии и духовных практик, объединяя их в единую систему.',
-  },
-];
-
-const STATS: {value: string; label: string}[] = [
-  {value: '>500', label: 'личных сессий'},
-  {value: '>5000', label: 'учеников по всему миру'},
-  {value: '>100', label: 'живых семинаров'},
-];
-
-type Props = {onBack: () => void};
-
-export function ClubScreen({onBack}: Props) {
+export function ClubScreen({onOpenMap, onClose}: Props) {
   const {top, bottom} = useSafeAreaInsets();
+  const {clubs} = useClubs();
+
+  const count = clubs.length;
+  const subtitle =
+    count > 0
+      ? `${count} ${cityWord(count)} по всему миру – найдите ближайшее ` +
+        'пространство практики и поддержки.'
+      : 'Найдите ближайшее пространство практики и поддержки.';
 
   return (
-    <GradientBackground>
-      <View style={styles.root}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.content,
-            {paddingTop: top + 7 + BTN_SIZE + 20, paddingBottom: bottom + 130},
-          ]}
-          showsVerticalScrollIndicator={false}>
-          <Text style={styles.intro}>{INTRO}</Text>
+    <>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 110},
+        ]}
+        showsVerticalScrollIndicator={false}>
+        {/* Intro */}
+        <View style={styles.intro}>
+          <Text style={styles.title}>Клуб Михаила Агеева</Text>
+          <Text style={styles.subtitle}>
+            Это сообщество людей, объединённых практиками Михаила и стремлением к
+            внутреннему балансу.
+          </Text>
+        </View>
 
-          <Image
-            source={require('../assets/images/club-hero-0d641b.png')}
-            style={styles.hero}
-            resizeMode="cover"
-          />
-
-          {SECTIONS.map(section => (
-            <View key={section.title} style={styles.section}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-              <Text style={styles.sectionBody}>{section.body}</Text>
-            </View>
-          ))}
-
-          <Image
-            source={require('../assets/images/club-mikhail-04aa6f.png')}
-            style={styles.portrait}
-            resizeMode="cover"
-          />
-
-          <View style={styles.statsRow}>
-            {STATS.map(stat => (
-              <View key={stat.value} style={styles.statItem}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
+        {/* Map preview + search */}
+        <View style={styles.previewGroup}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={onOpenMap}
+            style={styles.cardShadow}>
+            <View style={styles.card}>
+              <Image
+                source={require('../assets/images/clubs-map.png')}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+              {/* Top→bottom darkening so the text stays legible. */}
+              <LinearGradient
+                colors={['rgba(102,102,102,0.4)', 'rgba(0,0,0,1)']}
+                start={{x: 0.5, y: 0}}
+                end={{x: 0.5, y: 1}}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+              {/* Expand badge (top-right) */}
+              <View style={styles.badge}>
+                <SvgXml xml={ICON_EXPAND} width={20} height={20} />
               </View>
-            ))}
-          </View>
-
-          <TouchableOpacity activeOpacity={0.85} style={styles.button}>
-            <Text style={styles.buttonText}>Подробнее</Text>
+              {/* Caption (bottom-left) */}
+              <View style={styles.cardText}>
+                <Text style={styles.cardTitle}>Клубы рядом с вами</Text>
+                <Text style={styles.cardSubtitle}>{subtitle}</Text>
+              </View>
+            </View>
           </TouchableOpacity>
-        </ScrollView>
 
-        {/* Fixed header overlay */}
-        <View
-          style={[styles.header, {paddingTop: top + 7}]}
-          pointerEvents="box-none">
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={onBack}
-            style={styles.backBtn}>
-            <SvgXml xml={ICON_BACK} width={24} height={24} />
+            onPress={onOpenMap}
+            style={styles.searchField}>
+            <SvgXml xml={ICON_SEARCH} width={16} height={16} />
+            <Text style={styles.searchPlaceholder}>Найти город</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>О школе</Text>
-          <View style={styles.backBtn} />
         </View>
-      </View>
-    </GradientBackground>
+      </ScrollView>
+
+      {/* Fixed header — title + close button (right) */}
+      <FixedHeader>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Клуб</Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onClose}
+            style={styles.closeBtn}>
+            <SvgXml xml={ICON_CLOSE} width={24} height={24} />
+          </TouchableOpacity>
+        </View>
+      </FixedHeader>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
+  scroll: {flex: 1},
+  content: {flexGrow: 1},
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: SECTION_MARGIN,
-    gap: 24,
+  },
+  headerTitle: {
+    ...typography.h1,
+    color: colors.white,
+  },
+  closeBtn: {
+    width: BTN_SIZE,
+    height: BTN_SIZE,
+    borderRadius: BTN_RADIUS,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
+  // ── Intro ────────────────────────────────────────────────────────────────
   intro: {
+    marginTop: 16,
+    marginHorizontal: SECTION_MARGIN,
+    gap: 12,
+  },
+  title: {
+    ...typography.h2,
+    color: colors.white,
+    textAlign: 'center',
+  },
+  subtitle: {
     ...typography.body,
     color: colors.white,
     opacity: 0.65,
     textAlign: 'center',
   },
-  hero: {
-    width: '100%',
-    height: 220,
-    borderRadius: 20,
-  },
 
-  section: {
-    gap: 12,
+  // ── Map preview card + search ──────────────────────────────────────────────
+  previewGroup: {
+    marginTop: 24,
+    marginHorizontal: SECTION_MARGIN,
+    gap: 16,
   },
-  sectionTitle: {
+  cardShadow: {
+    borderRadius: CARD_RADIUS,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 8},
+        shadowOpacity: 0.12,
+        shadowRadius: 24,
+      },
+      android: {elevation: 4},
+    }),
+  },
+  card: {
+    height: 230,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  badge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 47,
+    height: 47,
+    borderRadius: 23.5,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardText: {
+    padding: 16,
+    gap: 8,
+  },
+  cardTitle: {
     ...typography.bodyMedium,
     color: colors.white,
   },
-  sectionBody: {
-    ...typography.body,
-    color: colors.white,
-    opacity: 0.65,
-  },
-
-  portrait: {
-    width: '100%',
-    height: 300,
-    borderRadius: 20,
-  },
-
-  statsRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  statItem: {
-    flex: 1,
-    gap: 3,
-    alignItems: 'center',
-  },
-  statValue: {
-    ...typography.h1,
-    color: colors.white,
-    textAlign: 'center',
-  },
-  statLabel: {
+  cardSubtitle: {
     ...typography.small,
     color: colors.white,
     opacity: 0.65,
-    textAlign: 'center',
   },
-
-  button: {
-    backgroundColor: colors.white,
-    borderRadius: 50,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: 'rgb(95,167,214)',
-        shadowOffset: {width: 0, height: 14},
-        shadowOpacity: 0.35,
-        shadowRadius: 40,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
-  },
-  buttonText: {
-    ...typography.button,
-    color: colors.dark,
-  },
-
-  // ── Fixed header ──────────────────────────────────────────────────────────
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+  searchField: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SECTION_MARGIN,
+    gap: 10,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  backBtn: {
-    width: BTN_SIZE,
-    height: BTN_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    ...typography.h2,
+  searchPlaceholder: {
+    ...typography.small,
     color: colors.white,
-    flex: 1,
-    textAlign: 'center',
+    opacity: 0.65,
   },
 });

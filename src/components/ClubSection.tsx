@@ -28,7 +28,7 @@ export function ClubSection({onPress}: Props) {
         <View style={styles.photoShadow}>
           <View style={styles.photoClip}>
             <Image
-              source={require('../assets/images/club-photo-eed90b.png')}
+              source={require('../assets/images/club-photo-eed90b.jpg')}
               style={styles.photoImage}
               resizeMode="cover"
             />

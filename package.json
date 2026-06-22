@@ -20,7 +20,8 @@
     "react-native-linear-gradient": "^2.8.3",
     "react-native-safe-area-context": "^5.8.0",
     "react-native-svg": "^15.15.5",
-    "react-native-track-player": "^4.1.2"
+    "react-native-track-player": "^4.1.2",
+    "react-native-webview": "^13.16.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

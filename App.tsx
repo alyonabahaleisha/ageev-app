@@ -13,14 +13,17 @@ import {AboutAppBlock} from './src/components/AboutAppBlock';
 import {AffirmationCard} from './src/components/AffirmationCard';
 import {AngelHelper} from './src/components/AngelHelper';
 import {PracticeCards} from './src/components/PracticeCards';
-import {QuoteBlock} from './src/components/QuoteBlock';
 import {MeditationBlock} from './src/components/MeditationBlock';
 import {WebinarBlock} from './src/components/WebinarBlock';
+import {SchoolCard} from './src/components/SchoolCard';
 import {ClubSection} from './src/components/ClubSection';
 import {ThinkingScreen} from './src/screens/ThinkingScreen';
 import {PracticesScreen} from './src/screens/PracticesScreen';
 import {AffirmationsScreen} from './src/screens/AffirmationsScreen';
+import {SchoolScreen} from './src/screens/SchoolScreen';
 import {ClubScreen} from './src/screens/ClubScreen';
+import {ClubMapScreen} from './src/screens/ClubMapScreen';
+import {StoriesScreen} from './src/screens/StoriesScreen';
 
 TrackPlayer.registerPlaybackService(() => PlaybackService);
 
@@ -54,7 +57,9 @@ function AppContent() {
   const [thinkingReset, setThinkingReset] = useState(0);
   const [practicesReset, setPracticesReset] = useState(0);
   const [showAffirmations, setShowAffirmations] = useState(false);
-  const [showClub, setShowClub] = useState(false);
+  const [showSchool, setShowSchool] = useState(false);
+  const [showClubMap, setShowClubMap] = useState(false);
+  const [showStories, setShowStories] = useState(true);
 
   function handleTabPress(index: number) {
     if (index === activeTab) {
@@ -85,19 +90,16 @@ function AppContent() {
           ]}
           showsVerticalScrollIndicator={false}>
           <View style={styles.aboutSection}>
-            <AboutAppBlock />
-          </View>
-          <View style={styles.cardSection}>
-            <AffirmationCard onPress={() => setShowAffirmations(true)} />
-          </View>
-          <View style={styles.angelSection}>
-            <AngelHelper />
+            <AboutAppBlock onPressCircle={() => setShowStories(true)} />
           </View>
           <View style={styles.practiceSection}>
             <PracticeCards />
           </View>
-          <View style={styles.quoteSection}>
-            <QuoteBlock />
+          <View style={styles.angelSection}>
+            <AngelHelper />
+          </View>
+          <View style={styles.cardSection}>
+            <AffirmationCard onPress={() => setShowAffirmations(true)} />
           </View>
           <View style={styles.meditationSection}>
             <MeditationBlock />
@@ -105,8 +107,11 @@ function AppContent() {
           <View style={styles.webinarSection}>
             <WebinarBlock />
           </View>
+          <View style={styles.schoolSection}>
+            <SchoolCard onPress={() => setShowSchool(true)} />
+          </View>
           <View style={styles.clubSection}>
-            <ClubSection onPress={() => setShowClub(true)} />
+            <ClubSection onPress={() => handleTabPress(3)} />
           </View>
           <View style={[styles.bottomSpacer, {height: bottom + 110}]} />
         </ScrollView>
@@ -127,19 +132,44 @@ function AppContent() {
         <PracticesScreen resetSignal={practicesReset} />
       </Animated.View>
 
+      {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is
+          open so its header can't flash over the map during the WebView load. */}
+      {activeTab === 3 && !showClubMap && (
+        <View style={styles.screenSlot}>
+          <ClubScreen
+            onOpenMap={() => setShowClubMap(true)}
+            onClose={() => handleTabPress(0)}
+          />
+        </View>
+      )}
+
       {showAffirmations && (
         <View style={styles.screenSlot}>
           <AffirmationsScreen onBack={() => setShowAffirmations(false)} />
         </View>
       )}
 
-      {showClub && (
+      {showSchool && (
         <View style={styles.screenSlot}>
-          <ClubScreen onBack={() => setShowClub(false)} />
+          <SchoolScreen onBack={() => setShowSchool(false)} />
         </View>
       )}
 
       <BottomNavBar activeIndex={activeTab} onTabPress={handleTabPress} />
+
+      {/* Full-screen clubs map opens from the Club tab, above the nav bar. */}
+      {showClubMap && (
+        <View style={styles.screenSlot}>
+          <ClubMapScreen onClose={() => setShowClubMap(false)} />
+        </View>
+      )}
+
+      {/* Stories overlay sits above everything, including the nav bar. */}
+      {showStories && (
+        <View style={styles.screenSlot}>
+          <StoriesScreen onClose={() => setShowStories(false)} />
+        </View>
+      )}
     </GradientBackground>
   );
 }
@@ -148,12 +178,14 @@ const styles = StyleSheet.create({
   scroll: {flex: 1},
   content: {flexGrow: 1},
   aboutSection: {marginTop: 24},
-  cardSection: {marginTop: 24},
+  // "Рекомендует Михаил" now sits in the second slot (tight gap under the hero);
+  // the affirmation card follows below with the standard 40 gap.
+  practiceSection: {marginTop: 24},
+  cardSection: {marginTop: 40},
   angelSection: {marginTop: 40},
-  practiceSection: {marginTop: 40},
-  quoteSection: {marginTop: 40},
   meditationSection: {marginTop: 40},
   webinarSection: {marginTop: 40},
+  schoolSection: {marginTop: 40},
   clubSection: {marginTop: 40},
   bottomSpacer: {},
   screenSlot: {

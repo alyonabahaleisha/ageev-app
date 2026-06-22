@@ -1,88 +1,110 @@
 import React from 'react';
 import {
+  Dimensions,
   Image,
+  ImageBackground,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, {
-  Defs,
-  Ellipse,
-  FeGaussianBlur,
-  Filter,
-  RadialGradient,
-  Stop,
-} from 'react-native-svg';
 import {colors} from '../theme/colors';
-import {typography} from '../theme/typography';
 
-const CHIPS = ['Отношения', 'Тревога', 'Энергия', 'Деньги', 'Самооценка'];
+const SECTION_MARGIN = 24;
+const CARD_GAP = 12;
+const W = Dimensions.get('window').width;
+const CARD_W = Math.floor((W - SECTION_MARGIN * 2 - CARD_GAP) / 2);
+const CARD_H = Math.round((CARD_W * 140) / 163);
+const ANGEL_W = 79;
+const ANGEL_H = 96;
+const CARD_RADIUS = 20;
+
+// "С чем хотите поработать сегодня?" — life-area picker. Each card is a photo
+// with a dark overlay and a centered label. Order/labels mirror the Figma.
+const STATES = [
+  {
+    label: 'Самосознание, развитие уверенности',
+    image: require('../assets/images/states/state-self-awareness-122618.png'),
+  },
+  {
+    label: 'Самочувствие, здоровье',
+    image: require('../assets/images/states/state-health-41a32c.png'),
+  },
+  {
+    label: 'Отношения, семья, род',
+    image: require('../assets/images/states/state-relationships-7538c6.png'),
+  },
+  {
+    label: 'Призвание, реализация',
+    image: require('../assets/images/states/state-vocation-153c70.png'),
+  },
+  {
+    label: 'Деньги и изобилие',
+    image: require('../assets/images/states/state-money-2ffa7d.png'),
+  },
+  {
+    label: 'Новый уровень жизни',
+    image: require('../assets/images/states/state-new-level-ca9359.png'),
+  },
+  {
+    label: 'Тревога и страхи',
+    image: require('../assets/images/states/state-anxiety-76ce8e.png'),
+  },
+  {
+    label: 'Энергетическое развитие, активация способностей',
+    image: require('../assets/images/states/state-energy-47af5a.png'),
+  },
+  {
+    label: 'Ресурсное состояние',
+    image: require('../assets/images/states/state-resource-7c2376.png'),
+  },
+  {
+    label: 'Связь с Творцом и Ангелами',
+    image: require('../assets/images/states/state-creator-56deca.png'),
+  },
+];
+
+function StateCard({label, image}: (typeof STATES)[0]) {
+  return (
+    <TouchableOpacity activeOpacity={0.85} style={styles.cardShadow}>
+      <ImageBackground
+        source={image}
+        style={styles.cardClip}
+        imageStyle={styles.cardImage}>
+        <View style={styles.cardOverlay} pointerEvents="none" />
+        <Text style={styles.cardLabel}>{label}</Text>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
+}
 
 export function AngelHelper() {
   return (
     <View style={styles.container}>
-      {/* Radial glow background */}
-      <Svg
-        width={390}
-        height={414}
-        style={styles.glowSvg}
-        pointerEvents="none">
-        <Defs>
-          {Platform.OS === 'ios' ? (
-            <>
-              <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
-                <Stop offset="0%" stopColor="#7BC4F3" stopOpacity={1} />
-                <Stop offset="100%" stopColor="#47728D" stopOpacity={1} />
-              </RadialGradient>
-              <Filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
-                <FeGaussianBlur stdDeviation={70} />
-              </Filter>
-            </>
-          ) : (
-            <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.28} />
-              <Stop offset="40%" stopColor="#7BC4F3" stopOpacity={0.18} />
-              <Stop offset="75%" stopColor="#47728D" stopOpacity={0.07} />
-              <Stop offset="100%" stopColor="#47728D" stopOpacity={0} />
-            </RadialGradient>
-          )}
-        </Defs>
-        <Ellipse
-          cx={195}
-          cy={219}
-          rx={Platform.OS === 'ios' ? 195 : 270}
-          ry={Platform.OS === 'ios' ? 195 : 260}
-          fill="url(#glow)"
-          filter={Platform.OS === 'ios' ? 'url(#blur)' : undefined}
-        />
-      </Svg>
-
-      {/* Content */}
-      <View style={styles.content} pointerEvents="box-none">
-        {/* Angel */}
-        <View style={styles.angelSection}>
-          <Text style={styles.title}>Ты можешь начать с малого</Text>
-          <Image
-            source={require('../assets/images/angel-7ddf76.png')}
-            style={styles.angelImage}
-            resizeMode="contain"
-          />
-        </View>
-
-        {/* Pain picker */}
-        <View style={styles.painSection}>
-          <Text style={styles.question}>С чем хотите поработать сегодня?</Text>
-          <View style={styles.chipsRow}>
-            {CHIPS.map(chip => (
-              <TouchableOpacity key={chip} activeOpacity={0.7} style={styles.chip}>
-                <Text style={styles.chipText}>{chip}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+      {/* Question pill — its bottom-left corner is squared so the angel tucks in */}
+      <View style={styles.pill}>
+        <Text style={styles.question}>С чем хотите поработать сегодня?</Text>
       </View>
+
+      {/* States — horizontally scrollable row */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}>
+        {STATES.map(s => (
+          <StateCard key={s.label} {...s} />
+        ))}
+      </ScrollView>
+
+      {/* Angel peeking from the top-left corner, over the pill and first card */}
+      <Image
+        source={require('../assets/images/angel-7ddf76.png')}
+        style={styles.angel}
+        resizeMode="contain"
+      />
     </View>
   );
 }
@@ -90,64 +112,93 @@ export function AngelHelper() {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    height: 374,
   },
-  glowSvg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  content: {
-    position: 'absolute',
-    top: 0,
-    left: 24,
-    right: 24,
-    gap: 18,
-    alignItems: 'center',
-  },
-  angelSection: {
-    alignItems: 'center',
-    gap: 12,
-  },
-  title: {
-    ...typography.h2,
-    color: colors.white,
-    textAlign: 'center',
-  },
-  angelImage: {
-    width: 150,
-    height: 180,
-  },
-  painSection: {
-    alignSelf: 'stretch',
-    gap: 16,
-  },
-  question: {
-    ...typography.bodyLarge,
-    color: colors.white,
-    textAlign: 'center',
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  chip: {
+
+  // ── Question pill ─────────────────────────────────────────────────────────
+  pill: {
+    marginLeft: ANGEL_W,
+    marginRight: 17,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
-    paddingTop: 10,
-    paddingBottom: 12,
-    paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 8},
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 8},
+        shadowOpacity: 0.12,
+        shadowRadius: 24,
+      },
+    }),
   },
-  chipText: {
-    ...typography.body,
+  question: {
+    fontFamily: 'Manrope-Medium',
+    fontSize: 16,
+    lineHeight: 21,
+    color: colors.white,
+    textAlign: 'center',
+  },
+
+  // ── Angel ─────────────────────────────────────────────────────────────────
+  angel: {
+    position: 'absolute',
+    top: 7,
+    left: 0,
+    width: ANGEL_W,
+    height: ANGEL_H,
+    zIndex: 2,
+  },
+
+  // ── States — horizontal carousel ──────────────────────────────────────────
+  scroll: {
+    marginTop: 30,
+  },
+  scrollContent: {
+    paddingHorizontal: SECTION_MARGIN,
+    paddingVertical: 8, // breathing room so card shadows aren't clipped
+    columnGap: CARD_GAP,
+  },
+  cardShadow: {
+    width: CARD_W,
+    height: CARD_H,
+    borderRadius: CARD_RADIUS,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 8},
+        shadowOpacity: 0.12,
+        shadowRadius: 24,
+      },
+    }),
+  },
+  cardClip: {
+    flex: 1,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  cardImage: {
+    borderRadius: CARD_RADIUS,
+  },
+  cardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  cardLabel: {
+    fontFamily: 'Manrope-Regular',
+    fontSize: 16,
+    lineHeight: 21,
     color: colors.white,
     textAlign: 'center',
   },
