@@ -25,6 +25,12 @@ export type MindsetStateLink = {
   image?: string;
 };
 
+export type MindsetAffirmation = {
+  text: string;
+  /** Optional per-card background; falls back to affirmationsBackground. */
+  background?: string;
+};
+
 export type MindsetState = {
   id: string;
   title: string;
@@ -33,7 +39,7 @@ export type MindsetState = {
   coverImage: string;
   sortOrder: number;
   exercise: MindsetStateExercise;
-  affirmations: string[];
+  affirmations: MindsetAffirmation[];
   affirmationsBackground: string;
   breakfastTitle: string;
   breakfastUrl: string;
@@ -67,7 +73,16 @@ function normalize(id: string, raw: Record<string, unknown>): MindsetState {
       recommendations: cleanSteps(ex.recommendations),
     },
     affirmations: Array.isArray(raw.affirmations)
-      ? (raw.affirmations as string[]).filter(t => typeof t === 'string' && t.trim())
+      ? (raw.affirmations as unknown[])
+          .map(a =>
+            typeof a === 'string'
+              ? {text: a}
+              : {
+                  text: ((a as MindsetAffirmation)?.text as string) || '',
+                  background: (a as MindsetAffirmation)?.background || '',
+                },
+          )
+          .filter(a => a.text.trim())
       : [],
     affirmationsBackground: (raw.affirmationsBackground as string) || '',
     breakfastTitle: (raw.breakfastTitle as string) || '',

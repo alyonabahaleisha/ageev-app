@@ -27,7 +27,11 @@ import {GradientBackground} from '../components/GradientBackground';
 import LinearGradient from '../components/LinearGradient';
 import {RemoteImage} from '../components/RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
-import {MindsetState, MindsetStateExercise} from '../services/mindsetStates';
+import {
+  MindsetAffirmation,
+  MindsetState,
+  MindsetStateExercise,
+} from '../services/mindsetStates';
 import {formatDuration, useMeditations} from '../services/meditations';
 import {useWebinars} from '../services/webinars';
 import {colors} from '../theme/colors';
@@ -231,15 +235,17 @@ export function StateScreen({state, onBack}: Props) {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.hScroll}>
-              {state.affirmations.map((text, i) => (
+              {state.affirmations.map((a, i) => {
+                const cardBg = a.background || affBg;
+                return (
                 <View key={i} style={styles.affShadow}>
                   <TouchableOpacity
                     activeOpacity={0.85}
                     style={styles.affCard}
                     onPress={() => setFlowOpen(true)}>
-                    {!!affBg && (
+                    {!!cardBg && (
                       <RemoteImage
-                        source={{uri: affBg}}
+                        source={{uri: cardBg}}
                         style={styles.affBg}
                         resizeMode="cover"
                       />
@@ -253,7 +259,7 @@ export function StateScreen({state, onBack}: Props) {
                     <View style={styles.affCardInner}>
                       <View style={styles.affTextBlock}>
                         <Text style={styles.affText} numberOfLines={2}>
-                          {text}
+                          {a.text}
                         </Text>
                         <Text style={styles.affMore}>Читать полностью</Text>
                       </View>
@@ -271,7 +277,7 @@ export function StateScreen({state, onBack}: Props) {
                           activeOpacity={0.7}
                           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
                           onPress={() =>
-                            Share.share({message: text}).catch(() => {})
+                            Share.share({message: a.text}).catch(() => {})
                           }
                           style={styles.iconDim}>
                           <SvgXml xml={ICON_SHARE} width={22} height={22} />
@@ -280,7 +286,8 @@ export function StateScreen({state, onBack}: Props) {
                     </View>
                   </TouchableOpacity>
                 </View>
-              ))}
+                );
+              })}
             </ScrollView>
             <View style={styles.affBtnWrap}>
               <TouchableOpacity
@@ -409,7 +416,7 @@ export function StateScreen({state, onBack}: Props) {
 
       {flowOpen && (
         <AffirmationFlow
-          texts={state.affirmations}
+          items={state.affirmations}
           background={affBg}
           onClose={() => setFlowOpen(false)}
         />
@@ -437,46 +444,53 @@ function fontForText(text: string): {fontSize: number; lineHeight: number} {
 }
 
 function AffirmationFlow({
-  texts,
+  items,
   background,
   onClose,
 }: {
-  texts: string[];
+  items: MindsetAffirmation[];
   background?: string;
   onClose: () => void;
 }) {
   const {top, bottom} = useSafeAreaInsets();
-  const listRef = useRef<FlatList<string>>(null);
+  const listRef = useRef<FlatList<MindsetAffirmation>>(null);
   return (
     <View style={styles.flowRoot}>
-      {!!background && (
-        <>
-          <RemoteImage
-            source={{uri: background}}
-            style={styles.flowBg}
-            resizeMode="cover"
-          />
-          <View style={styles.flowOverlay} />
-        </>
-      )}
       <FlatList
         ref={listRef}
-        data={texts}
+        data={items}
         keyExtractor={(_, i) => String(i)}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         renderItem={({item}) => {
-          const f = fontForText(item);
+          const f = fontForText(item.text);
+          const pageBg = item.background || background;
           return (
-            <View style={[styles.flowPage, {paddingTop: top, paddingBottom: bottom}]}>
-              <Text
+            <View style={styles.flowPage}>
+              {!!pageBg && (
+                <>
+                  <RemoteImage
+                    source={{uri: pageBg}}
+                    style={styles.flowBg}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.flowOverlay} />
+                </>
+              )}
+              <View
                 style={[
-                  styles.flowText,
-                  {fontSize: f.fontSize, lineHeight: f.lineHeight},
+                  styles.flowPageInner,
+                  {paddingTop: top, paddingBottom: bottom},
                 ]}>
-                {item}
-              </Text>
+                <Text
+                  style={[
+                    styles.flowText,
+                    {fontSize: f.fontSize, lineHeight: f.lineHeight},
+                  ]}>
+                  {item.text}
+                </Text>
+              </View>
             </View>
           );
         }}
@@ -1019,6 +1033,9 @@ const styles = StyleSheet.create({
   },
   flowPage: {
     width: SCREEN_W,
+    flex: 1,
+  },
+  flowPageInner: {
     flex: 1,
     paddingHorizontal: 32,
     alignItems: 'center',
