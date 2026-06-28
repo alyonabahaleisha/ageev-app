@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Animated, ScrollView, StatusBar, StyleSheet, View} from 'react-native';
 import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
 import TrackPlayer from 'react-native-track-player';
@@ -26,6 +26,8 @@ import {SchoolScreen} from './src/screens/SchoolScreen';
 import {ClubScreen} from './src/screens/ClubScreen';
 import {ClubMapScreen} from './src/screens/ClubMapScreen';
 import {StoriesScreen} from './src/screens/StoriesScreen';
+import {useDailyStory} from './src/services/stories';
+import {prefetchImages} from './src/components/RemoteImage';
 
 TrackPlayer.registerPlaybackService(() => PlaybackService);
 
@@ -47,6 +49,19 @@ const HIDDEN = 0.001;
 function AppContent() {
   const {top, bottom} = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState(0);
+
+  // Load today's stories at launch (not when the viewer opens) and warm the
+  // image cache, so the first reel shows its real photo/quote immediately
+  // instead of the bundled defaults flashing first.
+  const {content: storyContent} = useDailyStory();
+  useEffect(() => {
+    if (!storyContent) return;
+    prefetchImages([
+      storyContent.quote.photoUrl,
+      storyContent.breakfast.backgroundUrl,
+      storyContent.affirmation.backgroundUrl,
+    ]);
+  }, [storyContent]);
 
   const opacity0 = useRef(new Animated.Value(VISIBLE)).current;
   const opacity1 = useRef(new Animated.Value(HIDDEN)).current;
@@ -184,7 +199,14 @@ function AppContent() {
       {/* Stories overlay sits above everything, including the nav bar. */}
       {showStories && (
         <View style={styles.screenSlot}>
-          <StoriesScreen onClose={() => setShowStories(false)} />
+          <StoriesScreen
+            content={storyContent}
+            onClose={() => setShowStories(false)}
+            onOpenPractices={() => {
+              setShowStories(false);
+              handleTabPress(2);
+            }}
+          />
         </View>
       )}
     </GradientBackground>

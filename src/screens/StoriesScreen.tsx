@@ -12,6 +12,8 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_CLOSE, ICON_SHARE} from '../assets/icons';
 import {STORY_SLIDES} from '../components/stories/StorySlides';
+import {StoryContent} from '../services/stories';
+import {usePlayer} from '../context/PlayerContext';
 import {colors} from '../theme/colors';
 
 const STORY_DURATION = 6000; // ms per slide
@@ -21,12 +23,18 @@ const TAP_SLOP = 10; // px of travel still treated as a stationary tap
 const MARGIN = 24;
 const SCREEN_W = Dimensions.get('window').width;
 
-type Props = {onClose: () => void};
+type Props = {
+  content: StoryContent | null;
+  onClose: () => void;
+  // Reel 4 "Все практики" → open the Практики tab (also dismisses the viewer).
+  onOpenPractices: () => void;
+};
 
 // Instagram-style stories viewer: auto-advancing segments up top, tap the right
 // side to skip forward / left to go back, press-and-hold to pause.
-export function StoriesScreen({onClose}: Props) {
+export function StoriesScreen({content, onClose, onOpenPractices}: Props) {
   const {top} = useSafeAreaInsets();
+  const {openPlayer} = usePlayer();
   const [index, setIndex] = useState(0);
   // Slides whose background image has finished decoding. A slide is only
   // revealed (and its timer started) once it's in here, so it appears fully
@@ -63,6 +71,22 @@ export function StoriesScreen({onClose}: Props) {
       onClose();
     }
   }, [index, last, onClose]);
+
+  // CTA handling: "Все практики" opens the Практики tab; "Духовный завтрак"
+  // starts its audio practice in the player; every CTA dismisses the viewer.
+  const handleCta = useCallback(
+    (key: string) => {
+      if (key === 'start') {
+        onOpenPractices();
+        return;
+      }
+      if (key === 'morning' && content?.breakfast.track) {
+        openPlayer(content.breakfast.track);
+      }
+      onClose();
+    },
+    [content, openPlayer, onClose, onOpenPractices],
+  );
 
   const run = useCallback(
     (from: number) => {
@@ -187,7 +211,11 @@ export function StoriesScreen({onClose}: Props) {
             key={s.key}
             style={[StyleSheet.absoluteFill, !visible && styles.hiddenSlide]}
             pointerEvents={i === index ? 'box-none' : 'none'}>
-            <SlideComponent onCta={onClose} onReady={() => markReady(i)} />
+            <SlideComponent
+              onCta={() => handleCta(s.key)}
+              onReady={() => markReady(i)}
+              content={content}
+            />
           </View>
         );
       })}
@@ -259,7 +287,7 @@ const styles = StyleSheet.create({
     left: MARGIN,
     right: MARGIN,
     flexDirection: 'row',
-    gap: 3,
+    gap: 4,
   },
   segmentTrack: {
     flex: 1,
