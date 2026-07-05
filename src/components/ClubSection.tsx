@@ -7,19 +7,26 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
 type Props = {onPress?: () => void};
 
 export function ClubSection({onPress}: Props) {
+  const t = useUIStrings();
   return (
     <View style={styles.container}>
       {/* Text block */}
       <View style={styles.textBlock}>
-        <Text style={styles.title}>Клубы рядом с вами</Text>
+        <Text style={styles.title}>
+          {t('home_clubs_title', 'Клубы рядом с вами')}
+        </Text>
         <Text style={styles.subtitle}>
-          148 городов по всему миру – найдите ближайшее пространство практики и поддержки.
+          {t(
+            'home_clubs_subtitle',
+            '148 городов по всему миру – найдите ближайшее пространство практики и поддержки.',
+          )}
         </Text>
       </View>
 
@@ -41,7 +48,7 @@ export function ClubSection({onPress}: Props) {
         activeOpacity={0.85}
         onPress={onPress}
         style={styles.button}>
-        <Text style={styles.buttonText}>Подробнее</Text>
+        <Text style={styles.buttonText}>{t('home_clubs_button', 'Подробнее')}</Text>
       </TouchableOpacity>
     </View>
   );

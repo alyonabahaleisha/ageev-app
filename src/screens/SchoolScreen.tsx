@@ -12,6 +12,7 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK} from '../assets/icons';
 import {GradientBackground} from '../components/GradientBackground';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -20,12 +21,12 @@ const BTN_SIZE = 34;
 
 type Section = {title: string; body: string};
 
-const INTRO =
+const DEFAULT_INTRO =
   'Школа Михаила Агеева – это пространство практик для работы с внутренним ' +
   'состоянием и качеством жизни. Здесь человек учится лучше понимать себя и ' +
   'выстраивать более гармоничное состояние через регулярные практики.';
 
-const SECTIONS: Section[] = [
+const DEFAULT_SECTIONS: Section[] = [
   {
     title: 'Философия',
     body:
@@ -49,7 +50,7 @@ const SECTIONS: Section[] = [
   },
 ];
 
-const STATS: {value: string; label: string}[] = [
+const DEFAULT_STATS: {value: string; label: string}[] = [
   {value: '>500', label: 'личных сессий'},
   {value: '>5000', label: 'учеников по всему миру'},
   {value: '>100', label: 'живых семинаров'},
@@ -59,6 +60,15 @@ type Props = {onBack: () => void};
 
 export function SchoolScreen({onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
+  const t = useUIStrings();
+  const sections = DEFAULT_SECTIONS.map((s, i) => ({
+    title: t(`school_section${i + 1}_title`, s.title),
+    body: t(`school_section${i + 1}_body`, s.body),
+  }));
+  const stats = DEFAULT_STATS.map((s, i) => ({
+    value: t(`school_stat${i + 1}_value`, s.value),
+    label: t(`school_stat${i + 1}_label`, s.label),
+  }));
 
   return (
     <GradientBackground>
@@ -70,7 +80,7 @@ export function SchoolScreen({onBack}: Props) {
             {paddingTop: top + 7 + BTN_SIZE + 20, paddingBottom: bottom + 130},
           ]}
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.intro}>{INTRO}</Text>
+          <Text style={styles.intro}>{t('school_intro', DEFAULT_INTRO)}</Text>
 
           <Image
             source={require('../assets/images/club-hero-0d641b.jpg')}
@@ -78,7 +88,7 @@ export function SchoolScreen({onBack}: Props) {
             resizeMode="cover"
           />
 
-          {SECTIONS.map(section => (
+          {sections.map(section => (
             <View key={section.title} style={styles.section}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
               <Text style={styles.sectionBody}>{section.body}</Text>
@@ -92,7 +102,7 @@ export function SchoolScreen({onBack}: Props) {
           />
 
           <View style={styles.statsRow}>
-            {STATS.map(stat => (
+            {stats.map(stat => (
               <View key={stat.value} style={styles.statItem}>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
@@ -101,7 +111,7 @@ export function SchoolScreen({onBack}: Props) {
           </View>
 
           <TouchableOpacity activeOpacity={0.85} style={styles.button}>
-            <Text style={styles.buttonText}>Подробнее</Text>
+            <Text style={styles.buttonText}>{t('school_button', 'Подробнее')}</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -115,7 +125,7 @@ export function SchoolScreen({onBack}: Props) {
             style={styles.backBtn}>
             <SvgXml xml={ICON_BACK} width={24} height={24} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>О школе</Text>
+          <Text style={styles.headerTitle}>{t('school_title', 'О школе')}</Text>
           <View style={styles.backBtn} />
         </View>
       </View>

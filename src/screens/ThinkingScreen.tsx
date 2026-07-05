@@ -13,6 +13,7 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_SEARCH} from '../assets/icons';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {useUIStrings} from '../services/uiStrings';
 import {RemoteImage} from '../components/RemoteImage';
 import {
   hasStateContent,
@@ -71,6 +72,7 @@ export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
   const scrollRef = useRef<ScrollView>(null);
   const {states, loading} = useMindsetStates();
   const visibleStates = states.filter(hasStateContent);
+  const t = useUIStrings();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({y: 0, animated: true});
@@ -90,9 +92,11 @@ export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
         {/* State picker */}
       <View style={styles.section}>
         <View style={styles.textBlock}>
-          <Text style={styles.sectionTitle}>Выберите состояние</Text>
+          <Text style={styles.sectionTitle}>
+            {t('thinking_picker_title', 'Выберите состояние')}
+          </Text>
           <Text style={styles.sectionSubtitle}>
-            Что откликается вам больше всего?
+            {t('thinking_picker_subtitle', 'Что откликается вам больше всего?')}
           </Text>
         </View>
 
@@ -119,7 +123,7 @@ export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
       {/* Fixed header */}
       <FixedHeader>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Мышление</Text>
+          <Text style={styles.headerTitle}>{t('thinking_title', 'Мышление')}</Text>
           <View style={styles.searchGlow}>
             <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn}>
               <SvgXml xml={ICON_SEARCH} width={24} height={24} />

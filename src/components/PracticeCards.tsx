@@ -17,6 +17,7 @@ import {
 } from '../services/recommended';
 import {RemoteImage} from './RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -79,25 +80,35 @@ type Props = {
 };
 
 export function PracticeCards({
-  title = 'Рекомендует Михаил',
-  subtitle = 'Сегодня для вас подобраны материалы, которые помогут двигаться вперёд',
+  title,
+  subtitle,
   titleAlign = 'center',
 }: Props = {}) {
   const {cards, loading} = useRecommended();
+  const t = useUIStrings();
+  const displayTitle = title ?? t('home_recommended_title', 'Рекомендует Михаил');
+  const displaySubtitle =
+    subtitle === null
+      ? null
+      : subtitle ??
+        t(
+          'home_recommended_subtitle',
+          'Сегодня для вас подобраны материалы, которые помогут двигаться вперёд',
+        );
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, titleAlign === 'left' && styles.headerLeft]}>
         <Text style={[styles.title, titleAlign === 'left' && styles.titleLeft]}>
-          {title}
+          {displayTitle}
         </Text>
-        {subtitle != null && (
+        {displaySubtitle != null && (
           <Text
             style={[
               styles.subtitle,
               titleAlign === 'left' && styles.subtitleLeft,
             ]}>
-            {subtitle}
+            {displaySubtitle}
           </Text>
         )}
       </View>

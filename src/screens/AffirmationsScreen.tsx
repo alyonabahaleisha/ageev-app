@@ -15,6 +15,7 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_AFFIRMATION, ICON_ARROW_UP, ICON_BACK} from '../assets/icons';
 import {Affirmation, useAffirmations} from '../services/affirmations';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -46,6 +47,8 @@ export function AffirmationsScreen({onBack}: Props) {
   const [activeFilter, setActiveFilter] = useState(0);
   const listRef = useRef<FlatList<Affirmation>>(null);
   const {affirmations, loading} = useAffirmations();
+  const t = useUIStrings();
+  const allLabel = t('affirmations_filter_all', ALL_FILTER);
 
   // Filter chips are derived from the categories present in admin data,
   // in their sortOrder-driven order, with "Все" pinned first.
@@ -56,8 +59,8 @@ export function AffirmationsScreen({onBack}: Props) {
         seen.push(a.categoryLabel);
       }
     }
-    return [ALL_FILTER, ...seen];
-  }, [affirmations]);
+    return [allLabel, ...seen];
+  }, [affirmations, allLabel]);
 
   const filtered =
     activeFilter === 0
@@ -103,7 +106,7 @@ export function AffirmationsScreen({onBack}: Props) {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={styles.affirmationText}>
-                  Аффирмации скоро появятся
+                  {t('affirmations_empty', 'Аффирмации скоро появятся')}
                 </Text>
               )}
             </View>
@@ -130,7 +133,10 @@ export function AffirmationsScreen({onBack}: Props) {
             {index === 0 && (
               <View style={[styles.hint, {bottom: SCREEN_H * HINT_BOTTOM_RATIO}]}>
                 <Text style={styles.hintText}>
-                  Проведите вверх, чтобы увидеть следующую аффирмацию
+                  {t(
+                    'affirmations_swipe_hint',
+                    'Проведите вверх, чтобы увидеть следующую аффирмацию',
+                  )}
                 </Text>
                 <SvgXml xml={ICON_ARROW_UP} width={24} height={24} />
               </View>
@@ -150,7 +156,9 @@ export function AffirmationsScreen({onBack}: Props) {
           pointerEvents="auto">
           <SvgXml xml={ICON_BACK} width={24} height={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Аффирмации</Text>
+        <Text style={styles.headerTitle}>
+          {t('affirmations_title', 'Аффирмации')}
+        </Text>
         <View style={styles.backBtn} />
       </View>
 

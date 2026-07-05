@@ -12,6 +12,7 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_CLOSE} from '../assets/icons';
 import {Club, useClubs} from '../services/clubs';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -23,7 +24,7 @@ const HEADER_CONTENT = 56;
 // forced to Russian (name:ru). GeoJSON clustering reproduces the Figma
 // cluster-count pins. Tapping a pin's Telegram link posts the URL back to RN
 // (window.ReactNativeWebView.postMessage) to open natively.
-function buildMapHtml(clubs: Club[]): string {
+function buildMapHtml(clubs: Club[], tgLabel: string): string {
   const points = clubs
     .filter(c => typeof c.latitude === 'number' && typeof c.longitude === 'number')
     .map(c => ({
@@ -53,6 +54,7 @@ function buildMapHtml(clubs: Club[]): string {
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script>
   var clubs = ${JSON.stringify(points)};
+  var tgLabel = ${JSON.stringify(tgLabel)};
   var byId = {};
   clubs.forEach(function(c){ byId[c.id] = c; });
   function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -81,7 +83,7 @@ function buildMapHtml(clubs: Club[]): string {
     var c = byId[id]; if(!c) return;
     var html = '<div class="city">'+esc(c.city)+'</div>'
       + (c.leader ? '<div class="leader">'+esc(c.leader)+'</div>' : '')
-      + (c.tg ? '<a class="tg" href="#" onclick="openTg(\\''+c.id+'\\');return false;">Перейти в Telegram</a>' : '');
+      + (c.tg ? '<a class="tg" href="#" onclick="openTg(\\''+c.id+'\\');return false;">'+esc(tgLabel)+'</a>' : '');
     new maplibregl.Popup({offset:14}).setLngLat(lngLat).setHTML(html).addTo(map);
   }
 
@@ -132,9 +134,11 @@ type Props = {onClose: () => void};
 export function ClubMapScreen({onClose}: Props) {
   const {top} = useSafeAreaInsets();
   const {clubs, loading} = useClubs();
+  const t = useUIStrings();
+  const tgLabel = t('clubs_map_telegram_link', 'Перейти в Telegram');
 
   // Rebuild the document only when the club set changes (rare, realtime).
-  const html = useMemo(() => buildMapHtml(clubs), [clubs]);
+  const html = useMemo(() => buildMapHtml(clubs, tgLabel), [clubs, tgLabel]);
 
   function onMessage(e: WebViewMessageEvent) {
     const url = e.nativeEvent.data;
@@ -166,7 +170,7 @@ export function ClubMapScreen({onClose}: Props) {
 
       {/* Solid blue header bar (Figma 382-5633): close left, title centered. */}
       <View style={[styles.header, {paddingTop: top, height: top + HEADER_CONTENT}]}>
-        <Text style={styles.title}>Наши клубы</Text>
+        <Text style={styles.title}>{t('clubs_map_title', 'Наши клубы')}</Text>
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={onClose}

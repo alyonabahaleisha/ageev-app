@@ -13,6 +13,7 @@ import {ICON_CLOCK} from '../assets/icons';
 import {RemoteImage} from './RemoteImage';
 import {formatDuration, Meditation, useMeditations} from '../services/meditations';
 import {usePlayer} from '../context/PlayerContext';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -56,10 +57,11 @@ function MeditationCard({item}: {item: Meditation}) {
 
 export function MeditationBlock() {
   const {meditations, loading} = useMeditations();
+  const t = useUIStrings();
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Медитации</Text>
+      <Text style={styles.title}>{t('home_meditations_title', 'Медитации')}</Text>
       {loading ? (
         <View style={styles.loader}>
           <ActivityIndicator color={colors.white} />

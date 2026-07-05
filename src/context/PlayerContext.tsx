@@ -1,5 +1,6 @@
 import React, {createContext, useCallback, useContext, useState} from 'react';
 import TrackPlayer, {Capability} from 'react-native-track-player';
+import {uiString} from '../services/uiStrings';
 
 export type PlayerTrack = {
   id: string;
@@ -60,7 +61,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
         id: t.id,
         url: t.audioUrl,
         title: t.title,
-        artist: t.artist || 'Михаил Агеев',
+        artist: t.artist || uiString('player_default_artist', 'Михаил Агеев'),
         artwork: t.coverUrl,
         duration: t.durationSeconds,
       });

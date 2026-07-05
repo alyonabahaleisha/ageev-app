@@ -6,6 +6,7 @@ import {PlaybackService} from './src/services/playbackService';
 import {PlayerProvider} from './src/context/PlayerContext';
 import {PlayerScreen} from './src/screens/PlayerScreen';
 import {GradientBackground} from './src/components/GradientBackground';
+import {SplashScreen} from './src/components/SplashScreen';
 import {BottomNavBar} from './src/components/BottomNavBar';
 import {HomeHeader} from './src/components/HomeHeader';
 import {FixedHeader, headerScrollPadding} from './src/components/FixedHeader';
@@ -39,6 +40,7 @@ function App() {
         <AppContent />
         <PlayerScreen />
       </PlayerProvider>
+      <SplashScreen />
     </SafeAreaProvider>
   );
 }
@@ -91,6 +93,7 @@ function AppContent() {
       }
       return;
     }
+    setSelectedState(null); // leaving a tab dismisses an open state detail
     opacities.forEach((op, i) => op.setValue(i === index ? VISIBLE : HIDDEN));
     setActiveTab(index);
   }
@@ -115,7 +118,7 @@ function AppContent() {
             <PracticeCards />
           </View>
           <View style={styles.angelSection}>
-            <AngelHelper />
+            <AngelHelper onOpenState={setSelectedState} />
           </View>
           <View style={styles.cardSection}>
             <AffirmationCard onPress={() => setShowAffirmations(true)} />
@@ -135,7 +138,7 @@ function AppContent() {
           <View style={[styles.bottomSpacer, {height: bottom + 110}]} />
         </ScrollView>
         <FixedHeader>
-          <HomeHeader name="Михаил" />
+          <HomeHeader />
         </FixedHeader>
       </Animated.View>
 
@@ -165,8 +168,9 @@ function AppContent() {
         </View>
       )}
 
-      {/* State detail screen — opens from the Мышление tab. */}
-      {activeTab === 1 && selectedState && (
+      {/* State detail — a top-level overlay so tapping a state card (from the
+          home picker or the Мышление tab) opens it directly, without a tab jump. */}
+      {selectedState && (
         <View style={styles.screenSlot}>
           <StateScreen
             state={selectedState}

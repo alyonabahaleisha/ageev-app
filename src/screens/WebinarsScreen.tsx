@@ -16,6 +16,7 @@ import {RemoteImage} from '../components/RemoteImage';
 import {formatDuration} from '../services/meditations';
 import {Webinar, useWebinars} from '../services/webinars';
 import {usePlayer} from '../context/PlayerContext';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -87,6 +88,7 @@ function WebinarCard({item}: {item: Webinar}) {
 export function WebinarsScreen({onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const {webinars, loading} = useWebinars();
+  const t = useUIStrings();
 
   return (
     <ScrollView
@@ -107,7 +109,7 @@ export function WebinarsScreen({onBack}: Props) {
       </View>
 
       {/* Title */}
-      <Text style={styles.title}>Вебинары</Text>
+      <Text style={styles.title}>{t('webinars_title', 'Вебинары')}</Text>
 
       {/* Cards grid */}
       {loading ? (

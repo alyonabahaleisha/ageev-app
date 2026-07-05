@@ -6,10 +6,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
 export function QuoteBlock() {
+  const t = useUIStrings();
   return (
     <View style={styles.blueGlow}>
     <View style={styles.shadow}>
@@ -34,9 +36,14 @@ export function QuoteBlock() {
           {/* Text block */}
           <View style={styles.textBlock}>
             <Text style={styles.quoteText}>
-              Интерес – это голос высшего {'“'}Я{'”'}, ведущий к призванию
+              {t(
+                'home_quote_text',
+                'Интерес – это голос высшего “Я”, ведущий к призванию',
+              )}
             </Text>
-            <Text style={styles.author}>Михаил Агеев</Text>
+            <Text style={styles.author}>
+              {t('home_quote_author', 'Михаил Агеев')}
+            </Text>
           </View>
         </View>
       </View>

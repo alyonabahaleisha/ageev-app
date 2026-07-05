@@ -8,14 +8,26 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {ICON_AFFIRMATION} from '../assets/icons';
+import {useAffirmations} from '../services/affirmations';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
 const CARD_H = 275;
 const CARD_RADIUS = 20;
 const CARD_PADDING = 24;
+const FALLBACK = 'Всё нужное приходит в своё время';
 
 export function AffirmationCard({onPress}: {onPress?: () => void}) {
+  // "Мысль на сегодня" — one real affirmation, rotating once per day.
+  const {affirmations} = useAffirmations();
+  const t = useUIStrings();
+  const text =
+    affirmations.length > 0
+      ? affirmations[Math.floor(Date.now() / 86400000) % affirmations.length]
+          .text
+      : t('home_affirmation_fallback', FALLBACK);
+
   return (
     <View style={styles.container}>
       <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
@@ -24,19 +36,19 @@ export function AffirmationCard({onPress}: {onPress?: () => void}) {
           style={styles.card}
           imageStyle={styles.cardImage}>
           <Text style={styles.subtitle}>
-            Сохраните эту мысль с собой на сегодня
+            {t('home_affirmation_subtitle', 'Сохраните эту мысль с собой на сегодня')}
           </Text>
           <View style={styles.quoteContainer}>
-            <Text style={styles.quote}>
-              Всё нужное приходит в своё время
-            </Text>
+            <Text style={styles.quote}>{text}</Text>
           </View>
           <SvgXml xml={ICON_AFFIRMATION} width={64} height={24} />
         </ImageBackground>
       </TouchableOpacity>
 
       <TouchableOpacity activeOpacity={0.85} style={styles.button} onPress={onPress}>
-        <Text style={styles.buttonText}>Погрузиться в поток аффирмаций</Text>
+        <Text style={styles.buttonText}>
+          {t('home_affirmation_button', 'Погрузиться в поток аффирмаций')}
+        </Text>
       </TouchableOpacity>
     </View>
   );

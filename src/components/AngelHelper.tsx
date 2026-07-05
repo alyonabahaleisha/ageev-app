@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Dimensions,
   Image,
-  ImageBackground,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,6 +9,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {RemoteImage} from './RemoteImage';
+import {
+  hasStateContent,
+  MindsetState,
+  useMindsetStates,
+} from '../services/mindsetStates';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 
 const SECTION_MARGIN = 24;
@@ -21,71 +27,58 @@ const ANGEL_W = 79;
 const ANGEL_H = 96;
 const CARD_RADIUS = 20;
 
-// "С чем хотите поработать сегодня?" — life-area picker. Each card is a photo
-// with a dark overlay and a centered label. Order/labels mirror the Figma.
-const STATES = [
-  {
-    label: 'Самосознание, развитие уверенности',
-    image: require('../assets/images/states/state-self-awareness-122618.png'),
-  },
-  {
-    label: 'Самочувствие, здоровье',
-    image: require('../assets/images/states/state-health-41a32c.png'),
-  },
-  {
-    label: 'Отношения, семья, род',
-    image: require('../assets/images/states/state-relationships-7538c6.png'),
-  },
-  {
-    label: 'Призвание, реализация',
-    image: require('../assets/images/states/state-vocation-153c70.png'),
-  },
-  {
-    label: 'Деньги и изобилие',
-    image: require('../assets/images/states/state-money-2ffa7d.png'),
-  },
-  {
-    label: 'Новый уровень жизни',
-    image: require('../assets/images/states/state-new-level-ca9359.png'),
-  },
-  {
-    label: 'Тревога и страхи',
-    image: require('../assets/images/states/state-anxiety-76ce8e.png'),
-  },
-  {
-    label: 'Энергетическое развитие, активация способностей',
-    image: require('../assets/images/states/state-energy-47af5a.png'),
-  },
-  {
-    label: 'Ресурсное состояние',
-    image: require('../assets/images/states/state-resource-7c2376.png'),
-  },
-  {
-    label: 'Связь с Творцом и Ангелами',
-    image: require('../assets/images/states/state-creator-56deca.png'),
-  },
-];
+type Props = {
+  onOpenState?: (state: MindsetState) => void;
+};
 
-function StateCard({label, image}: (typeof STATES)[0]) {
+function StateCard({
+  state,
+  onPress,
+}: {
+  state: MindsetState;
+  onPress: () => void;
+}) {
   return (
-    <TouchableOpacity activeOpacity={0.85} style={styles.cardShadow}>
-      <ImageBackground
-        source={image}
-        style={styles.cardClip}
-        imageStyle={styles.cardImage}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      style={styles.cardShadow}
+      onPress={onPress}>
+      <View style={styles.cardClip}>
+        {!!state.coverImage && (
+          <RemoteImage
+            source={{uri: state.coverImage}}
+            style={styles.cardBg}
+            resizeMode="cover"
+          />
+        )}
         <View style={styles.cardOverlay} pointerEvents="none" />
-        <Text style={styles.cardLabel}>{label}</Text>
-      </ImageBackground>
+        <View style={styles.cardLabelWrap}>
+          <Text style={styles.cardLabel}>{state.title}</Text>
+        </View>
+      </View>
     </TouchableOpacity>
   );
 }
 
-export function AngelHelper() {
+// "С чем хотите поработать сегодня?" — the home life-area picker. Same states as
+// the Мышление tab (loaded from the mindsetStates CMS); tapping opens the state.
+export function AngelHelper({onOpenState}: Props) {
+  const {states} = useMindsetStates();
+  const visibleStates = states.filter(hasStateContent);
+  const t = useUIStrings();
+
+  // Nothing configured yet — hide the section rather than show an empty pill.
+  if (visibleStates.length === 0) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       {/* Question pill — its bottom-left corner is squared so the angel tucks in */}
       <View style={styles.pill}>
-        <Text style={styles.question}>С чем хотите поработать сегодня?</Text>
+        <Text style={styles.question}>
+          {t('home_angel_question', 'С чем хотите поработать сегодня?')}
+        </Text>
       </View>
 
       {/* States — horizontally scrollable row */}
@@ -94,8 +87,8 @@ export function AngelHelper() {
         showsHorizontalScrollIndicator={false}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}>
-        {STATES.map(s => (
-          <StateCard key={s.label} {...s} />
+        {visibleStates.map(s => (
+          <StateCard key={s.id} state={s} onPress={() => onOpenState?.(s)} />
         ))}
       </ScrollView>
 
@@ -179,7 +172,8 @@ const styles = StyleSheet.create({
     }),
   },
   cardClip: {
-    flex: 1,
+    width: CARD_W,
+    height: CARD_H,
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     borderWidth: 1,
@@ -188,12 +182,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
   },
-  cardImage: {
-    borderRadius: CARD_RADIUS,
+  cardBg: {
+    position: 'absolute',
+    width: CARD_W,
+    height: CARD_H,
   },
   cardOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  cardLabelWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
   },
   cardLabel: {
     fontFamily: 'Manrope-Regular',

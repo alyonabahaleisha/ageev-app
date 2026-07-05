@@ -10,6 +10,7 @@ import {
 import {BlurView} from '@react-native-community/blur';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useUIStrings} from '../services/uiStrings';
 import {
   ICON_HOME,
   ICON_LAMP,
@@ -62,6 +63,7 @@ export function BottomNavBar({activeIndex: controlledIndex, onTabPress}: Props) 
   const [internalIndex, setInternalIndex] = useState(0);
   const activeIndex = controlledIndex ?? internalIndex;
   const insets = useSafeAreaInsets();
+  const t = useUIStrings();
 
   function handlePress(index: number) {
     if (controlledIndex === undefined) setInternalIndex(index);
@@ -111,7 +113,7 @@ export function BottomNavBar({activeIndex: controlledIndex, onTabPress}: Props) 
                   <Text
                     style={[styles.label, !isActive && styles.labelInactive]}
                     numberOfLines={1}>
-                    {tab.label}
+                    {t(`nav_${tab.key}`, tab.label)}
                   </Text>
                 </TouchableOpacity>
               );

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {ICON_USER, ICON_SEARCH} from '../assets/icons';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -19,7 +20,9 @@ type Props = {
   name?: string;
 };
 
-export function HomeHeader({name = 'Михаил'}: Props) {
+export function HomeHeader({name}: Props) {
+  const t = useUIStrings();
+  const displayName = name || t('home_header_name', 'Михаил');
   return (
     <View style={styles.container}>
       {/* Left: avatar + greeting */}
@@ -34,10 +37,10 @@ export function HomeHeader({name = 'Михаил'}: Props) {
         </View>
         <View style={styles.textBlock}>
           <Text style={styles.welcomeText} numberOfLines={1}>
-            Добро пожаловать,
+            {t('home_header_welcome', 'Добро пожаловать,')}
           </Text>
           <Text style={styles.nameText} numberOfLines={1}>
-            {name}
+            {displayName}
           </Text>
         </View>
       </View>

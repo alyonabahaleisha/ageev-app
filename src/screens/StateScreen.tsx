@@ -1,4 +1,4 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   Dimensions,
   FlatList,
@@ -33,9 +33,11 @@ import {
   MindsetStateExercise,
 } from '../services/mindsetStates';
 import {formatDuration, useMeditations} from '../services/meditations';
+import {loadStateProgress, saveStateProgress} from '../services/stateProgress';
+import {useUIStrings} from '../services/uiStrings';
 import {useWebinars} from '../services/webinars';
 import {colors} from '../theme/colors';
-import {typography} from '../theme/typography';
+import {fonts, typography} from '../theme/typography';
 
 const {width: SCREEN_W} = Dimensions.get('window');
 const SECTION_MARGIN = 24;
@@ -55,11 +57,13 @@ function youtubeThumb(url: string): string {
 function MediaCard({
   coverUrl,
   title,
+  description,
   durationSeconds = 0,
   onPress,
 }: {
   coverUrl: string;
   title: string;
+  description?: string;
   durationSeconds?: number;
   onPress: () => void;
 }) {
@@ -77,25 +81,35 @@ function MediaCard({
               resizeMode="cover"
             />
           )}
-          <View style={styles.mediaOverlay} />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.25)', 'rgba(102,102,102,0.25)']}
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 1}}
+            style={styles.mediaBg}
+          />
           <View style={styles.mediaContent}>
-            <Text style={styles.mediaTitle} numberOfLines={2}>
-              {title}
-            </Text>
-            <View style={styles.mediaFooter}>
-              {durationSeconds > 0 ? (
+            <View style={styles.mediaTextCol}>
+              <View style={styles.mediaTextTop}>
+                <Text style={styles.mediaTitle} numberOfLines={2}>
+                  {title}
+                </Text>
+                {!!description && (
+                  <Text style={styles.mediaDesc} numberOfLines={2}>
+                    {description}
+                  </Text>
+                )}
+              </View>
+              {durationSeconds > 0 && (
                 <View style={styles.timeRow}>
                   <SvgXml xml={ICON_CLOCK} width={18} height={18} />
                   <Text style={styles.timeText}>
                     {formatDuration(durationSeconds)}
                   </Text>
                 </View>
-              ) : (
-                <View />
               )}
-              <View style={styles.playBtn}>
-                <SvgXml xml={ICON_PLAY_TRIANGLE} width={16} height={16} />
-              </View>
+            </View>
+            <View style={styles.playBtn}>
+              <SvgXml xml={ICON_PLAY_TRIANGLE} width={16} height={16} />
             </View>
           </View>
         </View>
@@ -149,6 +163,7 @@ type Props = {state: MindsetState; onBack: () => void};
 
 export function StateScreen({state, onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
+  const t = useUIStrings();
   const {openPlayer} = usePlayer();
   const {meditations} = useMeditations();
   const {webinars} = useWebinars();
@@ -178,6 +193,49 @@ export function StateScreen({state, onBack}: Props) {
     ex.steps.length > 0 || ex.recommendations.length > 0;
   const hasExercise = !!(ex.title || ex.description || canStartExercise);
 
+  // Header progress: the state's activities are worked through in order
+  // (exercise → affirmations → meditations → webinars). The counter and bar
+  // fill as each activity is opened (Figma header 411-6847).
+  const stepKeys = useMemo(() => {
+    const keys: string[] = [];
+    if (hasExercise && canStartExercise) keys.push('exercise');
+    if (state.affirmations.length > 0) keys.push('affirmations');
+    if (stateMeditations.length > 0 || state.externalLinks.length > 0)
+      keys.push('meditations');
+    if (stateWebinars.length > 0) keys.push('webinars');
+    return keys;
+  }, [
+    hasExercise,
+    canStartExercise,
+    state.affirmations.length,
+    state.externalLinks.length,
+    stateMeditations.length,
+    stateWebinars.length,
+  ]);
+  const [doneSteps, setDoneSteps] = useState<Record<string, boolean>>({});
+
+  // Restore saved progress when this state opens, so returning to a practice
+  // keeps the header counter/bar where the user left off.
+  useEffect(() => {
+    let active = true;
+    loadStateProgress(state.id).then(saved => {
+      if (active) setDoneSteps(saved);
+    });
+    return () => {
+      active = false;
+    };
+  }, [state.id]);
+
+  const markStep = (k: string) =>
+    setDoneSteps(prev => {
+      if (prev[k]) return prev;
+      const next = {...prev, [k]: true};
+      saveStateProgress(state.id, next);
+      return next;
+    });
+  const totalSteps = stepKeys.length;
+  const completedSteps = stepKeys.filter(k => doneSteps[k]).length;
+
   return (
     <GradientBackground style={styles.root}>
       <ScrollView
@@ -200,7 +258,9 @@ export function StateScreen({state, onBack}: Props) {
           <View style={styles.exerciseWrap}>
             <View style={styles.exerciseCard}>
               <View style={styles.exerciseTitleBlock}>
-                <Text style={styles.exerciseDescriptor}>Упражнение дня</Text>
+                <Text style={styles.exerciseDescriptor}>
+                  {t('state_exercise_descriptor', 'Упражнение дня')}
+                </Text>
                 {!!ex.title && (
                   <Text style={styles.exerciseTitle}>{ex.title}</Text>
                 )}
@@ -220,8 +280,13 @@ export function StateScreen({state, onBack}: Props) {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   style={styles.primaryBtn}
-                  onPress={() => setExerciseOpen(true)}>
-                  <Text style={styles.primaryBtnText}>Начать</Text>
+                  onPress={() => {
+                    markStep('exercise');
+                    setExerciseOpen(true);
+                  }}>
+                  <Text style={styles.primaryBtnText}>
+                    {t('state_exercise_start', 'Начать')}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -230,7 +295,7 @@ export function StateScreen({state, onBack}: Props) {
 
         {/* Аффирмации */}
         {state.affirmations.length > 0 && (
-          <Section title="Аффирмации">
+          <Section title={t('state_affirmations_section', 'Аффирмации')}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -238,11 +303,15 @@ export function StateScreen({state, onBack}: Props) {
               {state.affirmations.map((a, i) => {
                 const cardBg = a.background || affBg;
                 return (
-                <View key={i} style={styles.affShadow}>
+                <View key={i} style={styles.affGlow}>
+                 <View style={styles.affShadow}>
                   <TouchableOpacity
                     activeOpacity={0.85}
                     style={styles.affCard}
-                    onPress={() => setFlowOpen(true)}>
+                    onPress={() => {
+                      markStep('affirmations');
+                      setFlowOpen(true);
+                    }}>
                     {!!cardBg && (
                       <RemoteImage
                         source={{uri: cardBg}}
@@ -251,7 +320,7 @@ export function StateScreen({state, onBack}: Props) {
                       />
                     )}
                     <LinearGradient
-                      colors={['rgba(0,0,0,0.4)', 'rgba(102,102,102,0.4)']}
+                      colors={['rgba(0,0,0,0.25)', 'rgba(102,102,102,0.25)']}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 1}}
                       style={styles.affBg}
@@ -261,7 +330,11 @@ export function StateScreen({state, onBack}: Props) {
                         <Text style={styles.affText} numberOfLines={2}>
                           {a.text}
                         </Text>
-                        <Text style={styles.affMore}>Читать полностью</Text>
+                        <View style={styles.affMoreWrap}>
+                          <Text style={styles.affMore}>
+                            {t('state_affirmation_more', 'Читать полностью')}
+                          </Text>
+                        </View>
                       </View>
                       <View style={styles.affIcons}>
                         <TouchableOpacity
@@ -271,7 +344,7 @@ export function StateScreen({state, onBack}: Props) {
                             setLiked(prev => ({...prev, [i]: !prev[i]}))
                           }
                           style={liked[i] ? undefined : styles.iconDim}>
-                          <SvgXml xml={ICON_HEART} width={22} height={22} />
+                          <SvgXml xml={ICON_HEART} width={24} height={24} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           activeOpacity={0.7}
@@ -280,11 +353,12 @@ export function StateScreen({state, onBack}: Props) {
                             Share.share({message: a.text}).catch(() => {})
                           }
                           style={styles.iconDim}>
-                          <SvgXml xml={ICON_SHARE} width={22} height={22} />
+                          <SvgXml xml={ICON_SHARE} width={24} height={24} />
                         </TouchableOpacity>
                       </View>
                     </View>
                   </TouchableOpacity>
+                 </View>
                 </View>
                 );
               })}
@@ -293,9 +367,12 @@ export function StateScreen({state, onBack}: Props) {
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.primaryBtn}
-                onPress={() => setFlowOpen(true)}>
+                onPress={() => {
+                  markStep('affirmations');
+                  setFlowOpen(true);
+                }}>
                 <Text style={styles.primaryBtnText}>
-                  Погрузиться в поток аффирмаций
+                  {t('state_affirmations_flow_btn', 'Погрузиться в поток аффирмаций')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -304,15 +381,20 @@ export function StateScreen({state, onBack}: Props) {
 
         {/* Духовный завтрак */}
         {!!state.breakfastUrl && (
-          <Section title="Духовный завтрак">
+          <Section title={t('state_breakfast_section', 'Духовный завтрак')}>
             <View style={styles.rowWrap}>
               <RowCard
-                title={state.breakfastTitle || 'Духовный завтрак'}
+                title={
+                  state.breakfastTitle ||
+                  t('state_breakfast_section', 'Духовный завтрак')
+                }
                 icon={ICON_PLAY_TRIANGLE}
                 onPress={() =>
                   openPlayer({
                     id: `${state.id}_breakfast`,
-                    title: state.breakfastTitle || 'Духовный завтрак',
+                    title:
+                      state.breakfastTitle ||
+                      t('state_breakfast_section', 'Духовный завтрак'),
                     description: state.title,
                     audioUrl: state.breakfastUrl,
                     coverUrl: state.coverImage,
@@ -326,7 +408,7 @@ export function StateScreen({state, onBack}: Props) {
 
         {/* Вебинары и медитации (внешние ссылки) — cards per design */}
         {state.externalLinks.length > 0 && (
-          <Section title="Вебинары и медитации">
+          <Section title={t('state_links_section', 'Вебинары и медитации')}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -336,7 +418,10 @@ export function StateScreen({state, onBack}: Props) {
                   key={i}
                   title={l.title}
                   coverUrl={l.image || youtubeThumb(l.url) || affBg}
-                  onPress={() => Linking.openURL(l.url).catch(() => {})}
+                  onPress={() => {
+                    markStep('meditations');
+                    Linking.openURL(l.url).catch(() => {});
+                  }}
                 />
               ))}
             </ScrollView>
@@ -345,7 +430,7 @@ export function StateScreen({state, onBack}: Props) {
 
         {/* Медитации */}
         {stateMeditations.length > 0 && (
-          <Section title="Медитации">
+          <Section title={t('state_meditations_section', 'Медитации')}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -354,9 +439,11 @@ export function StateScreen({state, onBack}: Props) {
                 <MediaCard
                   key={m.id}
                   title={m.title}
+                  description={m.description}
                   coverUrl={m.coverUrl}
                   durationSeconds={m.durationSeconds}
-                  onPress={() =>
+                  onPress={() => {
+                    markStep('meditations');
                     openPlayer({
                       id: m.id,
                       title: m.title,
@@ -364,8 +451,8 @@ export function StateScreen({state, onBack}: Props) {
                       audioUrl: m.audioUrl,
                       coverUrl: m.coverUrl,
                       durationSeconds: m.durationSeconds,
-                    })
-                  }
+                    });
+                  }}
                 />
               ))}
             </ScrollView>
@@ -374,7 +461,7 @@ export function StateScreen({state, onBack}: Props) {
 
         {/* Вебинары */}
         {stateWebinars.length > 0 && (
-          <Section title="Вебинары">
+          <Section title={t('state_webinars_section', 'Вебинары')}>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -383,9 +470,11 @@ export function StateScreen({state, onBack}: Props) {
                 <MediaCard
                   key={w.id}
                   title={w.title}
+                  description={w.description}
                   coverUrl={w.coverUrl}
                   durationSeconds={w.durationSeconds}
-                  onPress={() =>
+                  onPress={() => {
+                    markStep('webinars');
                     openPlayer({
                       id: w.id,
                       title: w.title,
@@ -393,8 +482,8 @@ export function StateScreen({state, onBack}: Props) {
                       audioUrl: w.audioUrl,
                       coverUrl: w.coverUrl,
                       durationSeconds: w.durationSeconds,
-                    })
-                  }
+                    });
+                  }}
                 />
               ))}
             </ScrollView>
@@ -409,8 +498,23 @@ export function StateScreen({state, onBack}: Props) {
             activeOpacity={0.8}
             onPress={onBack}
             hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-            <SvgXml xml={ICON_BACK} width={28} height={28} />
+            <SvgXml xml={ICON_BACK} width={34} height={34} />
           </TouchableOpacity>
+          {totalSteps > 0 && (
+            <>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {width: `${(completedSteps / totalSteps) * 100}%`},
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressCount}>
+                {completedSteps} / {totalSteps}
+              </Text>
+            </>
+          )}
         </View>
       </FixedHeader>
 
@@ -531,6 +635,7 @@ function ExerciseFlow({
   onClose: () => void;
 }) {
   const {top, bottom} = useSafeAreaInsets();
+  const t = useUIStrings();
   const {title, intro, steps, recommendations: recs} = exercise;
   const stepBg = exercise.stepsBackground || backgroundUrl;
 
@@ -592,7 +697,9 @@ function ExerciseFlow({
             activeOpacity={0.85}
             style={styles.primaryBtn}
             onPress={next}>
-            <Text style={styles.primaryBtnText}>Начать упражнение</Text>
+            <Text style={styles.primaryBtnText}>
+              {t('state_flow_start', 'Начать упражнение')}
+            </Text>
           </TouchableOpacity>
           {!!backgroundUrl && (
             <RemoteImage
@@ -638,7 +745,9 @@ function ExerciseFlow({
             )}
             {page.kind === 'recs' && (
               <>
-                <Text style={styles.exTitle}>Рекомендации по выполнению</Text>
+                <Text style={styles.exTitle}>
+                  {t('state_flow_recs_title', 'Рекомендации по выполнению')}
+                </Text>
                 {recs.map((r, i) => (
                   <View key={i} style={styles.exRecItem}>
                     {!!r.title && (
@@ -658,22 +767,30 @@ function ExerciseFlow({
                 activeOpacity={0.85}
                 style={styles.primaryBtn}
                 onPress={onClose}>
-                <Text style={styles.primaryBtnText}>Вернуться к практике</Text>
+                <Text style={styles.primaryBtnText}>
+                  {t('state_flow_back_to_practice', 'Вернуться к практике')}
+                </Text>
               </TouchableOpacity>
             ) : isLastStep ? (
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.primaryBtn}
                 onPress={() => (index < pages.length - 1 ? next() : onClose())}>
-                <Text style={styles.primaryBtnText}>Завершить</Text>
+                <Text style={styles.primaryBtnText}>
+                  {t('state_flow_finish', 'Завершить')}
+                </Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.exNavRow}>
                 <TouchableOpacity activeOpacity={0.8} onPress={back}>
-                  <Text style={styles.exNavText}>← Назад</Text>
+                  <Text style={styles.exNavText}>
+                    {'← ' + t('state_flow_back', 'Назад')}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.8} onPress={next}>
-                  <Text style={styles.exNavText}>Далее →</Text>
+                  <Text style={styles.exNavText}>
+                    {t('state_flow_next', 'Далее') + ' →'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -699,8 +816,25 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 15,
     paddingHorizontal: 24,
-    height: 28,
+    height: 34,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.brand.pale,
+  },
+  progressCount: {
+    ...typography.body,
+    color: colors.white,
   },
 
   headerText: {
@@ -888,7 +1022,21 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
-  // Affirmation cards
+  // Affirmation cards (Figma 389-6697): photo card, content centered as a
+  // group — affirmation text, underlined "Читать полностью", then heart/share.
+  affGlow: {
+    width: AFF_W,
+    height: AFF_H,
+    borderRadius: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: 'rgb(95,167,214)',
+        shadowOffset: {width: 0, height: 0},
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+      },
+    }),
+  },
   affShadow: {
     width: AFF_W,
     height: AFF_H,
@@ -905,28 +1053,33 @@ const styles = StyleSheet.create({
   affCardInner: {
     flex: 1,
     padding: 18,
-    justifyContent: 'space-between',
-    gap: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 18,
   },
-  affTextBlock: {flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10},
+  affTextBlock: {alignSelf: 'stretch', alignItems: 'center', gap: 12},
   affText: {
     ...typography.bodyLarge,
     color: colors.white,
     textAlign: 'center',
   },
+  affMoreWrap: {
+    paddingBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.white,
+    opacity: 0.7,
+  },
   affMore: {
-    fontFamily: typography.caption.fontFamily,
+    fontFamily: fonts.manrope.medium,
     fontSize: 14,
     lineHeight: 18,
     fontWeight: '500',
     color: colors.white,
-    opacity: 0.7,
-    textDecorationLine: 'underline',
   },
   affIcons: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
+    gap: 16,
   },
   iconDim: {opacity: 0.65},
   affBtnWrap: {paddingHorizontal: SECTION_MARGIN},
@@ -977,12 +1130,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   mediaBg: {position: 'absolute', width: MEDIA_W, height: MEDIA_H},
-  mediaOverlay: {
-    position: 'absolute',
-    width: MEDIA_W,
-    height: MEDIA_H,
-    backgroundColor: 'rgba(0,0,0,0.28)',
-  },
   mediaContent: {
     position: 'absolute',
     top: 0,
@@ -990,13 +1137,19 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 14,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  mediaTextCol: {
+    flex: 1,
     justifyContent: 'space-between',
   },
-  mediaTitle: {...typography.bodyMedium, color: colors.white},
-  mediaFooter: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+  mediaTextTop: {gap: 6},
+  mediaTitle: {...typography.body, color: colors.white},
+  mediaDesc: {
+    ...typography.small,
+    color: colors.white,
+    opacity: 0.65,
   },
   playBtn: {
     width: 50,

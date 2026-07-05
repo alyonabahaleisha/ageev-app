@@ -31,6 +31,7 @@ import {
 } from '../assets/icons';
 import {RemoteImage} from '../components/RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -211,7 +212,6 @@ const ctrl = StyleSheet.create({
 const SHEET_BODY_H = Math.min(340, Dimensions.get('window').height * 0.42);
 const DEFAULT_HEADER_H = 108; // visible height of the collapsed sheet header
 
-const TABS = ['Описание', 'Похожие практики'];
 
 // translateY snap points: 0 = fully expanded, SHEET_BODY_H = collapsed (the
 // body is pushed off the bottom of the screen, leaving only the drag header).
@@ -220,6 +220,11 @@ const EXPANDED_Y = 0;
 
 function DetailsSheet({description}: {description: string}) {
   const {bottom} = useSafeAreaInsets();
+  const t = useUIStrings();
+  const tabs = [
+    t('player_tab_description', 'Описание'),
+    t('player_tab_similar', 'Похожие практики'),
+  ];
 
   const [activeTab, setActiveTab] = useState(0);
   // Animate a transform (not layout height) so both the drag and the release
@@ -296,7 +301,7 @@ function DetailsSheet({description}: {description: string}) {
           <View style={styles.sheetHandle} />
         </View>
         <View style={[styles.tabs, {marginBottom: bottom + 4}]}>
-          {TABS.map((label, i) => (
+          {tabs.map((label, i) => (
             <TouchableOpacity
               key={label}
               activeOpacity={0.8}
@@ -320,13 +325,14 @@ function DetailsSheet({description}: {description: string}) {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[styles.sheetScroll, {paddingBottom: bottom + 24}]}>
             <Text style={styles.description}>
-              {description?.trim() || 'Описание появится позже.'}
+              {description?.trim() ||
+                t('player_no_description', 'Описание появится позже.')}
             </Text>
           </ScrollView>
         ) : (
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>
-              Скоро здесь появятся похожие практики.
+              {t('player_similar_placeholder', 'Скоро здесь появятся похожие практики.')}
             </Text>
           </View>
         )}

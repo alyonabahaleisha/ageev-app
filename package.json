@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@d11/react-native-fast-image": "^8.13.0",
+    "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-community/blur": "^4.4.1",
     "@react-native/new-app-screen": "0.85.3",
     "firebase": "^12.13.0",

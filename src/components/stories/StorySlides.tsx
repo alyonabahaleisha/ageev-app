@@ -13,6 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_QUOTE, ICON_STORY_HEART, ICON_STORY_SHARE} from '../../assets/icons';
 import {RemoteImage} from '../RemoteImage';
 import {StoryContent} from '../../services/stories';
+import {useUIStrings} from '../../services/uiStrings';
 import {colors} from '../../theme/colors';
 import {typography} from '../../theme/typography';
 
@@ -68,6 +69,7 @@ function SlideBackground({
 function QuoteSlide({onReady, content}: SlideProps) {
   const {top} = useSafeAreaInsets();
   const quote = content?.quote;
+  const t = useUIStrings();
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       {/* Background stays a bundled brand image; only the photo card + text are
@@ -96,9 +98,14 @@ function QuoteSlide({onReady, content}: SlideProps) {
           <SvgXml xml={ICON_QUOTE} width={20} height={17} />
           <Text style={styles.h2}>
             {quote?.text ||
-              'Интерес – это голос высшего “Я”, ведущий к призванию'}
+              t(
+                'story_quote_fallback',
+                'Интерес – это голос высшего “Я”, ведущий к призванию',
+              )}
           </Text>
-          <Text style={styles.author}>{quote?.author || 'Михаил Агеев'}</Text>
+          <Text style={styles.author}>
+            {quote?.author || t('story_quote_author_fallback', 'Михаил Агеев')}
+          </Text>
         </View>
       </View>
     </View>
@@ -109,6 +116,7 @@ function QuoteSlide({onReady, content}: SlideProps) {
 function MorningSlide({onCta, onReady, content}: SlideProps) {
   const {top, bottom} = useSafeAreaInsets();
   const breakfast = content?.breakfast;
+  const t = useUIStrings();
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -119,7 +127,7 @@ function MorningSlide({onCta, onReady, content}: SlideProps) {
         />
       </View>
       <Text style={[styles.title, {top: top + 97}]} pointerEvents="none">
-        Духовный завтрак
+        {t('story_breakfast_title', 'Духовный завтрак')}
       </Text>
       <View style={[styles.centerBlock, {top: top + 319}]} pointerEvents="none">
         {breakfast?.body ? (
@@ -127,10 +135,14 @@ function MorningSlide({onCta, onReady, content}: SlideProps) {
         ) : (
           <>
             <Text style={styles.body}>
-              То, как вы определяете себя в начале дня, создаёт события вашей
-              реальности. Спросите себя:
+              {t(
+                'story_breakfast_body',
+                'То, как вы определяете себя в начале дня, создаёт события вашей реальности. Спросите себя:',
+              )}
             </Text>
-            <Text style={styles.h1Mid}>Кто ты сегодня?</Text>
+            <Text style={styles.h1Mid}>
+              {t('story_breakfast_question', 'Кто ты сегодня?')}
+            </Text>
           </>
         )}
       </View>
@@ -138,7 +150,9 @@ function MorningSlide({onCta, onReady, content}: SlideProps) {
         activeOpacity={0.85}
         onPress={onCta}
         style={[styles.cta, {top: SCREEN_H - bottom - CTA_HEIGHT}]}>
-        <Text style={styles.ctaText}>Начать практику</Text>
+        <Text style={styles.ctaText}>
+          {t('story_breakfast_cta', 'Начать практику')}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -148,6 +162,7 @@ function MorningSlide({onCta, onReady, content}: SlideProps) {
 function AffirmationSlide({onReady, content}: SlideProps) {
   const {top} = useSafeAreaInsets();
   const affirmation = content?.affirmation;
+  const t = useUIStrings();
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <SlideBackground
@@ -155,11 +170,16 @@ function AffirmationSlide({onReady, content}: SlideProps) {
         fallback={require('../../assets/images/stories/story3-bg.png')}
         onReady={onReady}
       />
-      <Text style={[styles.title, {top: top + 97}]}>Аффирмация дня</Text>
+      <Text style={[styles.title, {top: top + 97}]}>
+        {t('story_affirmation_title', 'Аффирмация дня')}
+      </Text>
       <View style={[styles.centerBlock, {top: top + 297}]}>
         <Text style={styles.h1}>
           {affirmation?.text ||
-            'Я доверяю жизни и чувствую поддержку в каждом шаге'}
+            t(
+              'story_affirmation_fallback',
+              'Я доверяю жизни и чувствую поддержку в каждом шаге',
+            )}
         </Text>
         <View style={styles.iconRow}>
           <SvgXml xml={ICON_STORY_HEART} width={24} height={24} />
@@ -173,6 +193,7 @@ function AffirmationSlide({onReady, content}: SlideProps) {
 // ── Slide 4 — "Сегодня можно начать с малого", portrait + CTA ─────────────────
 function StartSmallSlide({onCta, onReady}: SlideProps) {
   const {top} = useSafeAreaInsets();
+  const t = useUIStrings();
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Image
@@ -207,17 +228,21 @@ function StartSmallSlide({onCta, onReady}: SlideProps) {
           resizeMode="cover"
         />
         <Text style={[styles.h2, styles.startTitle]}>
-          Сегодня можно начать с малого
+          {t('story_start_title', 'Сегодня можно начать с малого')}
         </Text>
         <Text style={[styles.body, styles.startBody]}>
-          Начните путь к лучшей версии себя – через практики, осознанность и
-          заботу о своём внутреннем состоянии.
+          {t(
+            'story_start_body',
+            'Начните путь к лучшей версии себя – через практики, осознанность и заботу о своём внутреннем состоянии.',
+          )}
         </Text>
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onCta}
           style={styles.ctaInline}>
-          <Text style={styles.ctaText}>Все практики</Text>
+          <Text style={styles.ctaText}>
+            {t('story_start_cta', 'Все практики')}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

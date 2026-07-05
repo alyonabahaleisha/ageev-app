@@ -14,6 +14,7 @@ import {ICON_SEARCH, ICON_EXPAND, ICON_CLOSE} from '../assets/icons';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
 import LinearGradient from '../components/LinearGradient';
 import {useClubs} from '../services/clubs';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -23,12 +24,12 @@ const BTN_RADIUS = 23.5;
 const CARD_RADIUS = 20;
 
 // Russian plural for "город" (city): 1 → город, 2–4 → города, else → городов.
-function cityWord(n: number): string {
+function cityWord(n: number, forms: [string, string, string]): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'город';
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'города';
-  return 'городов';
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1];
+  return forms[2];
 }
 
 type Props = {onOpenMap: () => void; onClose: () => void};
@@ -36,13 +37,24 @@ type Props = {onOpenMap: () => void; onClose: () => void};
 export function ClubScreen({onOpenMap, onClose}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const {clubs} = useClubs();
+  const t = useUIStrings();
 
   const count = clubs.length;
+  const cityForms: [string, string, string] = [
+    t('clubs_city_one', 'город'),
+    t('clubs_city_few', 'города'),
+    t('clubs_city_many', 'городов'),
+  ];
   const subtitle =
     count > 0
-      ? `${count} ${cityWord(count)} по всему миру – найдите ближайшее ` +
-        'пространство практики и поддержки.'
-      : 'Найдите ближайшее пространство практики и поддержки.';
+      ? `${count} ${cityWord(count, cityForms)} ${t(
+          'clubs_card_subtitle_suffix',
+          'по всему миру – найдите ближайшее пространство практики и поддержки.',
+        )}`
+      : t(
+          'clubs_card_subtitle_empty',
+          'Найдите ближайшее пространство практики и поддержки.',
+        );
 
   return (
     <>
@@ -55,10 +67,14 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
         showsVerticalScrollIndicator={false}>
         {/* Intro */}
         <View style={styles.intro}>
-          <Text style={styles.title}>Клуб Михаила Агеева</Text>
+          <Text style={styles.title}>
+            {t('clubs_intro_title', 'Клуб Михаила Агеева')}
+          </Text>
           <Text style={styles.subtitle}>
-            Это сообщество людей, объединённых практиками Михаила и стремлением к
-            внутреннему балансу.
+            {t(
+              'clubs_intro_subtitle',
+              'Это сообщество людей, объединённых практиками Михаила и стремлением к внутреннему балансу.',
+            )}
           </Text>
         </View>
 
@@ -88,7 +104,9 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
               </View>
               {/* Caption (bottom-left) */}
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Клубы рядом с вами</Text>
+                <Text style={styles.cardTitle}>
+                  {t('clubs_card_title', 'Клубы рядом с вами')}
+                </Text>
                 <Text style={styles.cardSubtitle}>{subtitle}</Text>
               </View>
             </View>
@@ -99,7 +117,9 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
             onPress={onOpenMap}
             style={styles.searchField}>
             <SvgXml xml={ICON_SEARCH} width={16} height={16} />
-            <Text style={styles.searchPlaceholder}>Найти город</Text>
+            <Text style={styles.searchPlaceholder}>
+              {t('clubs_search_placeholder', 'Найти город')}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -107,7 +127,7 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
       {/* Fixed header — title + close button (right) */}
       <FixedHeader>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Клуб</Text>
+          <Text style={styles.headerTitle}>{t('clubs_title', 'Клуб')}</Text>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onClose}

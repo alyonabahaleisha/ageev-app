@@ -14,6 +14,7 @@ import {formatDuration} from '../services/meditations';
 import {Webinar, useWebinars} from '../services/webinars';
 import {RemoteImage} from './RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -71,10 +72,11 @@ function WebinarCard({card}: {card: Webinar}) {
 
 export function WebinarBlock() {
   const {webinars, loading} = useWebinars();
+  const t = useUIStrings();
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Вебинары</Text>
+      <Text style={styles.title}>{t('home_webinars_title', 'Вебинары')}</Text>
       {loading ? (
         <View style={styles.loader}>
           <ActivityIndicator color={colors.white} />

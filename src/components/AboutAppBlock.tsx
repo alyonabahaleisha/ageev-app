@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import Svg, {Circle} from 'react-native-svg';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {fonts} from '../theme/typography';
 
@@ -98,16 +99,24 @@ function StoryRing() {
 }
 
 export function AboutAppBlock({onPressCircle}: {onPressCircle?: () => void}) {
+  const t = useUIStrings();
   return (
     <View style={styles.container}>
       {/* txt */}
       <View style={styles.txt}>
-        <Text style={styles.title}>{'“Жизнь – это подарок Бога”'}</Text>
+        <Text style={styles.title}>
+          {t('home_about_title', '“Жизнь – это подарок Бога”')}
+        </Text>
         <View style={styles.subBlock}>
           <Text style={styles.subtitle}>
-            Практики и поддержка для внутренней силы, гармонии и связи с собой.
+            {t(
+              'home_about_subtitle',
+              'Практики и поддержка для внутренней силы, гармонии и связи с собой.',
+            )}
           </Text>
-          <Text style={styles.author}>С Михаилом Агеевым</Text>
+          <Text style={styles.author}>
+            {t('home_about_author', 'С Михаилом Агеевым')}
+          </Text>
         </View>
       </View>
 

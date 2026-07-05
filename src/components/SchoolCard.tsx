@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -15,6 +16,7 @@ type Props = {onPress?: () => void};
 // "О школе" — cover image up top (rounded top corners) over a frosted info
 // panel (rounded bottom corners) with title, description and a primary button.
 export function SchoolCard({onPress}: Props) {
+  const t = useUIStrings();
   return (
     <View style={styles.cardGlow}>
       <View style={styles.cardShadow}>
@@ -26,17 +28,23 @@ export function SchoolCard({onPress}: Props) {
           />
           <View style={styles.panel}>
             <View style={styles.textBlock}>
-              <Text style={styles.title}>Школа Михаила Агеева</Text>
+              <Text style={styles.title}>
+                {t('home_school_title', 'Школа Михаила Агеева')}
+              </Text>
               <Text style={styles.description}>
-                В Школе мы даём знания, которые помогут вам почувствовать полную
-                свободу и стать творцом своей жизни.
+                {t(
+                  'home_school_description',
+                  'В Школе мы даём знания, которые помогут вам почувствовать полную свободу и стать творцом своей жизни.',
+                )}
               </Text>
             </View>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={onPress}
               style={styles.button}>
-              <Text style={styles.buttonText}>Подробнее</Text>
+              <Text style={styles.buttonText}>
+                {t('home_school_button', 'Подробнее')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

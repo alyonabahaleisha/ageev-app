@@ -15,6 +15,7 @@ import {ICON_BACK, ICON_CLOCK, ICON_MORE_HORIZONTAL, ICON_SEARCH} from '../asset
 import {RemoteImage} from '../components/RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
 import {formatDuration, Meditation, useMeditations} from '../services/meditations';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -28,18 +29,8 @@ const CARD_RADIUS = 20;
 const BTN_SIZE = 47;
 const BTN_RADIUS = 23.5;
 
-const FILTERS = [
-  'Все',
-  'Короткие',
-  'Длинные',
-  'Спокойствие',
-  'Тревога',
-  'Любовь',
-  'Энергия',
-  'Изобилие',
-  'Уверенность',
-  'Принятие',
-];
+const DEFAULT_FILTERS =
+  'Все, Короткие, Длинные, Спокойствие, Тревога, Любовь, Энергия, Изобилие, Уверенность, Принятие';
 
 
 type Props = {onBack: () => void};
@@ -95,6 +86,11 @@ export function MeditationsScreen({onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState(0);
   const {meditations, loading} = useMeditations();
+  const t = useUIStrings();
+  const filters = t('meditations_filters', DEFAULT_FILTERS)
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 
   return (
     <ScrollView
@@ -115,7 +111,7 @@ export function MeditationsScreen({onBack}: Props) {
       </View>
 
       {/* Title */}
-      <Text style={styles.title}>Медитации</Text>
+      <Text style={styles.title}>{t('meditations_title', 'Медитации')}</Text>
 
       {/* Filter chips */}
       <ScrollView
@@ -123,7 +119,7 @@ export function MeditationsScreen({onBack}: Props) {
         showsHorizontalScrollIndicator={false}
         style={styles.filtersScroll}
         contentContainerStyle={styles.filtersContent}>
-        {FILTERS.map((label, i) => (
+        {filters.map((label, i) => (
           <TouchableOpacity
             key={label}
             activeOpacity={0.85}

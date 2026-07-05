@@ -18,6 +18,7 @@ import {WebinarsScreen} from './WebinarsScreen';
 import {AffirmationsScreen} from './AffirmationsScreen';
 import {GradientBackground} from '../components/GradientBackground';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
@@ -33,24 +34,28 @@ const BTN_RADIUS = 23.5;
 
 const FORMATS = [
   {
+    id: 'meditations',
     label: 'Медитации',
     icon: require('../assets/images/format-meditation-6a1889.png'),
     iconW: 30,
     iconH: 34,
   },
   {
+    id: 'affirmations',
     label: 'Аффирмации',
     icon: require('../assets/images/format-affirmations-56586a.png'),
     iconW: 30,
     iconH: 30,
   },
   {
+    id: 'webinars',
     label: 'Вебинары',
     icon: require('../assets/images/format-webinar-56586b-56586a.png'),
     iconW: 30,
     iconH: 23,
   },
   {
+    id: 'music',
     label: 'Музыка',
     icon: require('../assets/images/format-music-56586c-56586a.png'),
     iconW: 30,
@@ -95,6 +100,7 @@ export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
     'list' | 'meditations' | 'affirmations' | 'webinars'
   >('list');
   const scrollRef = useRef<ScrollView>(null);
+  const t = useUIStrings();
 
   useEffect(() => {
     setSubScreen('list');
@@ -115,7 +121,7 @@ export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
         {/* Recommended */}
         <View style={styles.recommendedSection}>
           <PracticeCards
-            title="Рекомендовано для вас"
+            title={t('practices_recommended_title', 'Рекомендовано для вас')}
             subtitle={null}
             titleAlign="left"
           />
@@ -123,18 +129,21 @@ export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
 
         {/* Format picker */}
         <View style={styles.formatSection}>
-          <Text style={styles.formatTitle}>Выберите формат</Text>
+          <Text style={styles.formatTitle}>
+            {t('practices_format_title', 'Выберите формат')}
+          </Text>
           <View style={styles.formatGrid}>
             {FORMATS.map(f => (
               <FormatChip
-                key={f.label}
+                key={f.id}
                 {...f}
+                label={t(`practices_format_${f.id}`, f.label)}
                 onPress={
-                  f.label === 'Медитации'
+                  f.id === 'meditations'
                     ? () => setSubScreen('meditations')
-                    : f.label === 'Аффирмации'
+                    : f.id === 'affirmations'
                     ? () => setSubScreen('affirmations')
-                    : f.label === 'Вебинары'
+                    : f.id === 'webinars'
                     ? () => setSubScreen('webinars')
                     : undefined
                 }
@@ -150,7 +159,7 @@ export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
       {subScreen === 'list' && (
         <FixedHeader>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Практики</Text>
+            <Text style={styles.headerTitle}>{t('practices_title', 'Практики')}</Text>
             <View style={styles.searchGlow}>
               <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn}>
                 <SvgXml xml={ICON_SEARCH} width={24} height={24} />
