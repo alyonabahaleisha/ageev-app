@@ -128,7 +128,11 @@ export function BottomNavBar({activeIndex: controlledIndex, onTabPress}: Props) 
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => handlePress(CIRCLE_TAB_INDEX)}
-        style={[styles.activeCircle, {left: circleLeft(CIRCLE_TAB_INDEX)}]}>
+        style={[
+          styles.activeCircle,
+          {left: circleLeft(CIRCLE_TAB_INDEX)},
+          activeIndex === CIRCLE_TAB_INDEX && styles.activeCircleLit,
+        ]}>
         <SvgXml xml={TABS[CIRCLE_TAB_INDEX].icon} width={ICON_SIZE} height={ICON_SIZE} />
       </TouchableOpacity>
     </View>
@@ -213,5 +217,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+  },
+  // Design 411:7519: the circle "lights up" while Практики is the active tab
+  // (0px 4px 20px rgba(95,166,213,1)).
+  activeCircleLit: {
+    shadowColor: 'rgb(95,166,213)',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 1,
+    shadowRadius: 20,
+    elevation: 12,
   },
 });
