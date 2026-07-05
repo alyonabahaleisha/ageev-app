@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {
   Image,
   Linking,
@@ -47,6 +47,24 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
     ? clubs.filter(c => c.city.toLowerCase().includes(trimmed))
     : [];
 
+  // When the search input focuses, scroll it up under the header so the
+  // keyboard doesn't cover it and the results list gets the space between.
+  const scrollRef = useRef<ScrollView>(null);
+  const searchWrapRef = useRef<View>(null);
+  const scrollOffset = useRef(0);
+  const scrollSearchIntoView = () => {
+    searchWrapRef.current?.measureInWindow((_x, winY) => {
+      const desiredY = headerScrollPadding(top) + 8;
+      const delta = winY - desiredY;
+      if (delta > 0) {
+        scrollRef.current?.scrollTo({
+          y: scrollOffset.current + delta,
+          animated: true,
+        });
+      }
+    });
+  };
+
   const count = clubs.length;
   const cityForms: [string, string, string] = [
     t('clubs_city_one', 'город'),
@@ -67,11 +85,19 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
   return (
     <>
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
           {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 110},
         ]}
+        onScroll={e => {
+          scrollOffset.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}>
         {/* Intro */}
         <View style={styles.intro}>
@@ -120,7 +146,7 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
             </View>
           </TouchableOpacity>
 
-          <View style={styles.searchField}>
+          <View ref={searchWrapRef} style={styles.searchField}>
             <SvgXml xml={ICON_SEARCH} width={16} height={16} />
             <TextInput
               value={query}
@@ -130,6 +156,7 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
               style={styles.searchInput}
               autoCorrect={false}
               returnKeyType="search"
+              onFocus={scrollSearchIntoView}
             />
           </View>
 
