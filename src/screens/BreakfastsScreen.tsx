@@ -12,6 +12,7 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK, ICON_CLOCK, ICON_SEARCH} from '../assets/icons';
+import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
 import LinearGradient from '../components/LinearGradient';
 import {RemoteImage} from '../components/RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
@@ -109,22 +110,11 @@ export function BreakfastsScreen({onBack}: Props) {
     .filter(Boolean);
 
   return (
+    <>
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, {paddingTop: top + 7}]}
+      contentContainerStyle={[styles.content, {paddingTop: headerScrollPadding(top)}]}
       showsVerticalScrollIndicator={false}>
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity activeOpacity={0.8} onPress={onBack} style={styles.backBtn}>
-          <SvgXml xml={ICON_BACK} width={24} height={24} />
-        </TouchableOpacity>
-        <View style={styles.searchGlow}>
-          <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn}>
-            <SvgXml xml={ICON_SEARCH} width={24} height={24} />
-          </TouchableOpacity>
-        </View>
-      </View>
 
       {/* Title — centered H2 per design */}
       <Text style={styles.title}>
@@ -165,6 +155,21 @@ export function BreakfastsScreen({onBack}: Props) {
 
       <View style={{height: bottom + 110}} />
     </ScrollView>
+
+    {/* Sticky header — pinned above the scrolling content */}
+    <FixedHeader>
+      <View style={styles.header}>
+        <TouchableOpacity activeOpacity={0.8} onPress={onBack} style={styles.backBtn}>
+          <SvgXml xml={ICON_BACK} width={24} height={24} />
+        </TouchableOpacity>
+        <View style={styles.searchGlow}>
+          <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn}>
+            <SvgXml xml={ICON_SEARCH} width={24} height={24} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </FixedHeader>
+    </>
   );
 }
 
