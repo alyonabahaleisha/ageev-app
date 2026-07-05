@@ -1,6 +1,7 @@
-import React, {useRef, useState} from 'react';
+import React, {useState} from 'react';
 import {
   Image,
+  Keyboard,
   Linking,
   Platform,
   ScrollView,
@@ -14,6 +15,7 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK, ICON_SEARCH, ICON_EXPAND, ICON_CLOSE} from '../assets/icons';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {GradientBackground} from '../components/GradientBackground';
 import LinearGradient from '../components/LinearGradient';
 import {useClubs} from '../services/clubs';
 import {useUIStrings} from '../services/uiStrings';
@@ -41,28 +43,19 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
   const {clubs} = useClubs();
   const t = useUIStrings();
   const [query, setQuery] = useState('');
+  // Search mode: the input docks at the top under the header and the results
+  // fill the screen (all cities when the query is empty).
+  const [searchActive, setSearchActive] = useState(false);
 
   const trimmed = query.trim().toLowerCase();
   const results = trimmed
     ? clubs.filter(c => c.city.toLowerCase().includes(trimmed))
-    : [];
+    : clubs;
 
-  // When the search input focuses, scroll it up under the header so the
-  // keyboard doesn't cover it and the results list gets the space between.
-  const scrollRef = useRef<ScrollView>(null);
-  const searchWrapRef = useRef<View>(null);
-  const scrollOffset = useRef(0);
-  const scrollSearchIntoView = () => {
-    searchWrapRef.current?.measureInWindow((_x, winY) => {
-      const desiredY = headerScrollPadding(top) + 8;
-      const delta = winY - desiredY;
-      if (delta > 0) {
-        scrollRef.current?.scrollTo({
-          y: scrollOffset.current + delta,
-          animated: true,
-        });
-      }
-    });
+  const closeSearch = () => {
+    setSearchActive(false);
+    setQuery('');
+    Keyboard.dismiss();
   };
 
   const count = clubs.length;
@@ -85,19 +78,11 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
   return (
     <>
       <ScrollView
-        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
           {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 110},
         ]}
-        onScroll={e => {
-          scrollOffset.current = e.nativeEvent.contentOffset.y;
-        }}
-        scrollEventThrottle={16}
-        automaticallyAdjustKeyboardInsets
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}>
         {/* Intro */}
         <View style={styles.intro}>
@@ -146,22 +131,50 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
             </View>
           </TouchableOpacity>
 
-          <View ref={searchWrapRef} style={styles.searchField}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setSearchActive(true)}
+            style={styles.searchField}>
             <SvgXml xml={ICON_SEARCH} width={16} height={16} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t('clubs_search_placeholder', 'Найти город')}
-              placeholderTextColor="rgba(255,255,255,0.65)"
-              style={styles.searchInput}
-              autoCorrect={false}
-              returnKeyType="search"
-              onFocus={scrollSearchIntoView}
-            />
+            <Text style={styles.searchPlaceholder}>
+              {t('clubs_search_placeholder', 'Найти город')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Search mode — full-screen overlay: input docked at the top, city list
+          below it, everything above the keyboard. */}
+      {searchActive && (
+        <GradientBackground style={styles.searchOverlay}>
+          <View style={[styles.searchTopRow, {paddingTop: headerScrollPadding(top)}]}>
+            <View style={[styles.searchField, styles.searchFieldActive]}>
+              <SvgXml xml={ICON_SEARCH} width={16} height={16} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t('clubs_search_placeholder', 'Найти город')}
+                placeholderTextColor="rgba(255,255,255,0.65)"
+                style={styles.searchInput}
+                autoCorrect={false}
+                returnKeyType="search"
+                autoFocus
+              />
+            </View>
+            <TouchableOpacity activeOpacity={0.8} onPress={closeSearch}>
+              <Text style={styles.searchCancel}>
+                {t('clubs_search_cancel', 'Отмена')}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Search results — city rows per design (411:7402) */}
-          {trimmed.length > 0 && (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.resultsContent}
+            automaticallyAdjustKeyboardInsets
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}>
             <View style={styles.results}>
               {results.map((club, i) => (
                 <React.Fragment key={club.id}>
@@ -193,9 +206,9 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
                 </Text>
               )}
             </View>
-          )}
-        </View>
-      </ScrollView>
+          </ScrollView>
+        </GradientBackground>
+      )}
 
       {/* Fixed header — title + close button (right) */}
       <FixedHeader>
@@ -322,6 +335,40 @@ const styles = StyleSheet.create({
     color: colors.white,
     flex: 1,
     padding: 0,
+  },
+  searchPlaceholder: {
+    ...typography.small,
+    color: colors.white,
+    opacity: 0.65,
+  },
+
+  // ── Search mode overlay ─────────────────────────────────────────────────────
+  searchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+  },
+  searchTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: SECTION_MARGIN,
+    paddingBottom: 4,
+  },
+  searchFieldActive: {
+    flex: 1,
+  },
+  searchCancel: {
+    ...typography.body,
+    color: colors.white,
+  },
+  resultsContent: {
+    paddingHorizontal: SECTION_MARGIN,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
 
   // ── Search results (design 411:7402) ───────────────────────────────────────
