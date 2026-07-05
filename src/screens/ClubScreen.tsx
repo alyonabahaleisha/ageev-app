@@ -1,16 +1,18 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
   Image,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ICON_SEARCH, ICON_EXPAND, ICON_CLOSE} from '../assets/icons';
+import {ICON_BACK, ICON_SEARCH, ICON_EXPAND, ICON_CLOSE} from '../assets/icons';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
 import LinearGradient from '../components/LinearGradient';
 import {useClubs} from '../services/clubs';
@@ -38,6 +40,12 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const {clubs} = useClubs();
   const t = useUIStrings();
+  const [query, setQuery] = useState('');
+
+  const trimmed = query.trim().toLowerCase();
+  const results = trimmed
+    ? clubs.filter(c => c.city.toLowerCase().includes(trimmed))
+    : [];
 
   const count = clubs.length;
   const cityForms: [string, string, string] = [
@@ -112,15 +120,53 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={onOpenMap}
-            style={styles.searchField}>
+          <View style={styles.searchField}>
             <SvgXml xml={ICON_SEARCH} width={16} height={16} />
-            <Text style={styles.searchPlaceholder}>
-              {t('clubs_search_placeholder', 'Найти город')}
-            </Text>
-          </TouchableOpacity>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t('clubs_search_placeholder', 'Найти город')}
+              placeholderTextColor="rgba(255,255,255,0.65)"
+              style={styles.searchInput}
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+          </View>
+
+          {/* Search results — city rows per design (411:7402) */}
+          {trimmed.length > 0 && (
+            <View style={styles.results}>
+              {results.map((club, i) => (
+                <React.Fragment key={club.id}>
+                  {i > 0 && <View style={styles.resultDivider} />}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={styles.resultRow}
+                    onPress={() =>
+                      club.telegramUrl &&
+                      Linking.openURL(club.telegramUrl).catch(() => {})
+                    }>
+                    <View style={styles.resultText}>
+                      <Text style={styles.resultCity}>{club.city}</Text>
+                      <Text style={styles.resultInfo} numberOfLines={1}>
+                        {[club.country, club.leader].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                    <View style={styles.resultBtn}>
+                      <View style={styles.resultArrow}>
+                        <SvgXml xml={ICON_BACK} width={20} height={20} />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </React.Fragment>
+              ))}
+              {results.length === 0 && (
+                <Text style={styles.resultEmpty}>
+                  {t('clubs_search_empty', 'Ничего не найдено')}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -244,9 +290,60 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
   },
-  searchPlaceholder: {
+  searchInput: {
+    ...typography.small,
+    color: colors.white,
+    flex: 1,
+    padding: 0,
+  },
+
+  // ── Search results (design 411:7402) ───────────────────────────────────────
+  results: {
+    gap: 12,
+  },
+  resultDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  resultText: {
+    flex: 1,
+    gap: 8,
+  },
+  resultCity: {
+    fontFamily: 'Manrope-Medium',
+    fontSize: 18,
+    lineHeight: 21.6,
+    fontWeight: '500',
+    color: colors.white,
+  },
+  resultInfo: {
+    ...typography.body,
+    color: colors.white,
+    opacity: 0.65,
+  },
+  resultBtn: {
+    width: BTN_SIZE,
+    height: BTN_SIZE,
+    borderRadius: BTN_RADIUS,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultArrow: {
+    transform: [{rotate: '180deg'}],
+  },
+  resultEmpty: {
     ...typography.small,
     color: colors.white,
     opacity: 0.65,
+    textAlign: 'center',
+    paddingVertical: 8,
   },
 });
