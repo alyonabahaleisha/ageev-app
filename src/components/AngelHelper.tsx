@@ -176,8 +176,6 @@ const styles = StyleSheet.create({
     height: CARD_H,
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
