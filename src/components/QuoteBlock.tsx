@@ -96,7 +96,11 @@ const styles = StyleSheet.create({
   },
   // Figma: rgba(0,0,0,0.08) fill over the photo
   photoOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.08)',
   },
   quotePanel: {
