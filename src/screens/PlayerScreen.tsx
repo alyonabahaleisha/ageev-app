@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   Animated,
   Dimensions,
+  Easing,
   Modal,
   PanResponder,
   Platform,
@@ -12,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from '../components/LinearGradient';
-import {SvgXml} from 'react-native-svg';
+import Svg, {Circle, SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import TrackPlayer, {
   usePlaybackState,
@@ -137,9 +138,112 @@ const pb = StyleSheet.create({
   },
 });
 
+// Buffering indicator: the same travelling-light ring the home portrait uses
+// (soft glow + bright core arc), circling the play button until audio starts.
+// The arc is drawn once and the container is ROTATED with a native-driver
+// transform, so the spin stays 60fps even while the JS thread is busy
+// downloading audio (animating strokeDashoffset ran on JS and stuttered).
+const PLAY_BTN_SIZE = 78;
+const RING_R = 35;
+const RING_C = 2 * Math.PI * RING_R;
+const RING_GLINT = RING_C * 0.28;
+const RING_SHOW_DELAY_MS = 200; // don't flash on sub-200ms buffer blips
+const RING_FADE_MS = 220;
+
+function BufferingRing({fade}: {fade: Animated.Value}) {
+  const spin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration: 1100,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [spin]);
+
+  const rotate = spin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+  const c = PLAY_BTN_SIZE / 2;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, {opacity: fade, transform: [{rotate}]}]}>
+      <Svg width={PLAY_BTN_SIZE} height={PLAY_BTN_SIZE}>
+        <Circle
+          cx={c}
+          cy={c}
+          r={RING_R}
+          stroke="rgba(255,255,255,0.22)"
+          strokeWidth={4}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={[RING_GLINT, RING_C]}
+        />
+        <Circle
+          cx={c}
+          cy={c}
+          r={RING_R}
+          stroke="rgba(255,255,255,0.7)"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={[RING_GLINT, RING_C]}
+        />
+      </Svg>
+    </Animated.View>
+  );
+}
+
 function Controls() {
   const state = usePlaybackState();
   const isPlaying = state.state === State.Playing;
+  // Audio is being fetched/buffered (slow networks make this noticeable) —
+  // the travelling-light ring makes the wait visible.
+  const isLoading =
+    state.state === State.Loading || state.state === State.Buffering;
+
+  // Ring fades in after a short delay (skips fast-network blips) and fades
+  // out when playback starts; the icon dims on the same curve.
+  const fade = useRef(new Animated.Value(0)).current;
+  const [ringMounted, setRingMounted] = useState(false);
+  useEffect(() => {
+    if (isLoading) {
+      const timer = setTimeout(() => {
+        setRingMounted(true);
+        Animated.timing(fade, {
+          toValue: 1,
+          duration: RING_FADE_MS,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      }, RING_SHOW_DELAY_MS);
+      return () => clearTimeout(timer);
+    }
+    Animated.timing(fade, {
+      toValue: 0,
+      duration: RING_FADE_MS,
+      easing: Easing.in(Easing.ease),
+      useNativeDriver: true,
+    }).start(({finished}) => {
+      if (finished) {
+        setRingMounted(false);
+      }
+    });
+    return undefined;
+  }, [isLoading, fade]);
+
+  const iconOpacity = fade.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.35],
+  });
 
   return (
     <View style={ctrl.row}>
@@ -151,16 +255,19 @@ function Controls() {
         <SvgXml xml={ICON_REPLAY10} width={35} height={35} />
       </TouchableOpacity>
 
-      {/* Play / Pause */}
+      {/* Play / Pause / Buffering */}
       <TouchableOpacity
         activeOpacity={0.8}
         style={ctrl.playBtn}
         onPress={() => (isPlaying ? TrackPlayer.pause() : TrackPlayer.play())}>
-        <SvgXml
-          xml={isPlaying ? ICON_PAUSE : ICON_PLAY_TRIANGLE}
-          width={isPlaying ? 30 : 24}
-          height={isPlaying ? 30 : 24}
-        />
+        <Animated.View style={{opacity: iconOpacity}}>
+          <SvgXml
+            xml={isPlaying ? ICON_PAUSE : ICON_PLAY_TRIANGLE}
+            width={isPlaying ? 30 : 24}
+            height={isPlaying ? 30 : 24}
+          />
+        </Animated.View>
+        {ringMounted && <BufferingRing fade={fade} />}
       </TouchableOpacity>
 
       {/* Forward 10 */}

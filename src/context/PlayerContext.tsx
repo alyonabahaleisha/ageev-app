@@ -1,4 +1,10 @@
-import React, {createContext, useCallback, useContext, useState} from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import TrackPlayer, {Capability} from 'react-native-track-player';
 import {uiString} from '../services/uiStrings';
 
@@ -31,7 +37,10 @@ let playerReady = false;
 async function ensurePlayer() {
   if (playerReady) return;
   try {
-    await TrackPlayer.setupPlayer({waitForBuffer: true});
+    // waitForBuffer=false → start playback as soon as the first chunk
+    // arrives instead of waiting for AVPlayer's "safe" buffer (which took
+    // seconds on long webinar files).
+    await TrackPlayer.setupPlayer({waitForBuffer: false});
   } catch (e: any) {
     if (!e?.message?.includes('already been initialized')) throw e;
   }
@@ -53,7 +62,16 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   const [isVisible, setIsVisible] = useState(false);
   const [track, setTrack] = useState<PlayerTrack | null>(null);
 
+  // Set the player up once at launch so the first tap doesn't pay for it.
+  useEffect(() => {
+    ensurePlayer().catch(() => {});
+  }, []);
+
   const openPlayer = useCallback(async (t: PlayerTrack) => {
+    // Show the player instantly; the audio pipeline spins up behind it so the
+    // tap always gets an immediate response.
+    setTrack(t);
+    setIsVisible(true);
     try {
       await ensurePlayer();
       await TrackPlayer.reset();
@@ -66,8 +84,6 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
         duration: t.durationSeconds,
       });
       await TrackPlayer.play();
-      setTrack(t);
-      setIsVisible(true);
     } catch (e) {
       console.warn('[Player] error:', e);
     }
