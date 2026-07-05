@@ -19,6 +19,7 @@ import {usePlayer} from '../context/PlayerContext';
 import {Breakfast, useBreakfasts} from '../services/breakfasts';
 import {formatDuration} from '../services/meditations';
 import {useContentFilters} from '../services/contentFilters';
+import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -101,6 +102,7 @@ export function BreakfastsScreen({onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const {breakfasts, loading} = useBreakfasts();
   const t = useUIStrings();
+  const {openSearch} = useSearch();
   const {filters, activeIndex, setActiveIndex, filtered} = useContentFilters(
     breakfasts,
   );
@@ -159,7 +161,7 @@ export function BreakfastsScreen({onBack}: Props) {
           <SvgXml xml={ICON_BACK} width={24} height={24} />
         </TouchableOpacity>
         <View style={styles.searchGlow}>
-          <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn}>
+          <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn} onPress={openSearch}>
             <SvgXml xml={ICON_SEARCH} width={24} height={24} />
           </TouchableOpacity>
         </View>

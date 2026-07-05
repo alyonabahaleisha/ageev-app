@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {ICON_USER, ICON_SEARCH} from '../assets/icons';
+import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -22,6 +23,7 @@ type Props = {
 
 export function HomeHeader({name}: Props) {
   const t = useUIStrings();
+  const {openSearch} = useSearch();
   const displayName = name || t('home_header_name', 'Михаил');
   return (
     <View style={styles.container}>
@@ -47,7 +49,7 @@ export function HomeHeader({name}: Props) {
 
       {/* Right: frosted circle — white glow wrapper keeps radius small so shape stays circular */}
       <View style={styles.searchGlow}>
-        <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn}>
+        <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn} onPress={openSearch}>
           <SvgXml xml={ICON_SEARCH} width={ICON_SIZE} height={ICON_SIZE} />
         </TouchableOpacity>
       </View>

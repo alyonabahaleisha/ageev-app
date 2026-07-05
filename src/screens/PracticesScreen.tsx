@@ -20,6 +20,7 @@ import {BreakfastsScreen} from './BreakfastsScreen';
 import {GradientBackground} from '../components/GradientBackground';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
 import {useBreakfasts} from '../services/breakfasts';
+import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -96,13 +97,25 @@ function FormatChip({
   );
 }
 
-export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
+type FormatSignal = {
+  id: 'meditations' | 'affirmations' | 'webinars' | 'breakfasts';
+  n: number;
+} | null;
+
+export function PracticesScreen({
+  resetSignal = 0,
+  formatSignal = null,
+}: {
+  resetSignal?: number;
+  formatSignal?: FormatSignal;
+}) {
   const {top, bottom} = useSafeAreaInsets();
   const [subScreen, setSubScreen] = useState<
     'list' | 'meditations' | 'affirmations' | 'webinars' | 'breakfasts'
   >('list');
   const scrollRef = useRef<ScrollView>(null);
   const t = useUIStrings();
+  const {openSearch} = useSearch();
   // Warm the breakfast list + cover cache from app launch (this tab is always
   // mounted), so the Завтраки grid opens with its images already cached.
   useBreakfasts();
@@ -111,6 +124,13 @@ export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
     setSubScreen('list');
     scrollRef.current?.scrollTo({y: 0, animated: true});
   }, [resetSignal]);
+
+  // Search screen's «Быстрые категории» jump straight into a sub-screen.
+  useEffect(() => {
+    if (formatSignal) {
+      setSubScreen(formatSignal.id);
+    }
+  }, [formatSignal]);
 
   return (
     <>
@@ -168,7 +188,7 @@ export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>{t('practices_title', 'Практики')}</Text>
             <View style={styles.searchGlow}>
-              <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn}>
+              <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn} onPress={openSearch}>
                 <SvgXml xml={ICON_SEARCH} width={24} height={24} />
               </TouchableOpacity>
             </View>

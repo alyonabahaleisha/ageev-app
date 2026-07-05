@@ -13,6 +13,7 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_SEARCH} from '../assets/icons';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {RemoteImage} from '../components/RemoteImage';
 import {
@@ -73,6 +74,7 @@ export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
   const {states, loading} = useMindsetStates();
   const visibleStates = states.filter(hasStateContent);
   const t = useUIStrings();
+  const {openSearch} = useSearch();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({y: 0, animated: true});
@@ -125,7 +127,7 @@ export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{t('thinking_title', 'Мышление')}</Text>
           <View style={styles.searchGlow}>
-            <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn}>
+            <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn} onPress={openSearch}>
               <SvgXml xml={ICON_SEARCH} width={24} height={24} />
             </TouchableOpacity>
           </View>
