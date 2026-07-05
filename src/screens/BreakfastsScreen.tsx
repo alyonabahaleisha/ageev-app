@@ -18,6 +18,7 @@ import {RemoteImage} from '../components/RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
 import {Breakfast, useBreakfasts} from '../services/breakfasts';
 import {formatDuration} from '../services/meditations';
+import {useContentFilters} from '../services/contentFilters';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -31,9 +32,6 @@ const CARD_W = Math.floor(
 const CARD_RADIUS = 20;
 const BTN_SIZE = 47;
 const BTN_RADIUS = 23.5;
-
-const DEFAULT_FILTERS =
-  'Все, Короткие, Длинные, Спокойствие, Тревога, Любовь, Энергия, Изобилие, Уверенность, Принятие';
 
 function BreakfastCard({item}: {item: Breakfast}) {
   const {openPlayer} = usePlayer();
@@ -101,13 +99,11 @@ type Props = {onBack: () => void};
 
 export function BreakfastsScreen({onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
-  const [activeFilter, setActiveFilter] = useState(0);
   const {breakfasts, loading} = useBreakfasts();
   const t = useUIStrings();
-  const filters = t('breakfasts_filters', DEFAULT_FILTERS)
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
+  const {filters, activeIndex, setActiveIndex, filtered} = useContentFilters(
+    breakfasts,
+  );
 
   return (
     <>
@@ -127,14 +123,14 @@ export function BreakfastsScreen({onBack}: Props) {
         showsHorizontalScrollIndicator={false}
         style={styles.filtersScroll}
         contentContainerStyle={styles.filtersContent}>
-        {filters.map((label, i) => (
+        {filters.map((f, i) => (
           <TouchableOpacity
-            key={label}
+            key={f.key}
             activeOpacity={0.85}
-            onPress={() => setActiveFilter(i)}
-            style={[styles.filterChip, i === activeFilter && styles.filterChipActive]}>
-            <Text style={[styles.filterText, i === activeFilter && styles.filterTextActive]}>
-              {label}
+            onPress={() => setActiveIndex(i)}
+            style={[styles.filterChip, i === activeIndex && styles.filterChipActive]}>
+            <Text style={[styles.filterText, i === activeIndex && styles.filterTextActive]}>
+              {f.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -147,7 +143,7 @@ export function BreakfastsScreen({onBack}: Props) {
         </View>
       ) : (
         <View style={styles.grid}>
-          {breakfasts.map(b => (
+          {filtered.map(b => (
             <BreakfastCard key={b.id} item={b} />
           ))}
         </View>

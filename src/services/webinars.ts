@@ -14,6 +14,8 @@ export type Webinar = {
   sortOrder: number;
   popular?: boolean;
   coverColor?: string;
+  /** Life-sphere key assigned in the CMS (drives the list filter chips). */
+  area?: string;
 };
 
 export function useWebinars() {

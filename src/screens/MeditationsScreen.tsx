@@ -16,6 +16,7 @@ import LinearGradient from '../components/LinearGradient';
 import {RemoteImage} from '../components/RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
 import {formatDuration, Meditation, useMeditations} from '../services/meditations';
+import {useContentFilters} from '../services/contentFilters';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -29,9 +30,6 @@ const CARD_PAD = 14;
 const PLAY_BTN = 50;
 const BTN_SIZE = 47;
 const BTN_RADIUS = 23.5;
-
-const DEFAULT_FILTERS =
-  'Все, Короткие, Длинные, Спокойствие, Тревога, Любовь, Энергия, Изобилие, Уверенность, Принятие';
 
 
 type Props = {onBack: () => void};
@@ -96,13 +94,11 @@ function MeditationCard({item}: {item: Meditation}) {
 
 export function MeditationsScreen({onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
-  const [activeFilter, setActiveFilter] = useState(0);
   const {meditations, loading} = useMeditations();
   const t = useUIStrings();
-  const filters = t('meditations_filters', DEFAULT_FILTERS)
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
+  const {filters, activeIndex, setActiveIndex, filtered} = useContentFilters(
+    meditations,
+  );
 
   return (
     <>
@@ -120,14 +116,14 @@ export function MeditationsScreen({onBack}: Props) {
         showsHorizontalScrollIndicator={false}
         style={styles.filtersScroll}
         contentContainerStyle={styles.filtersContent}>
-        {filters.map((label, i) => (
+        {filters.map((f, i) => (
           <TouchableOpacity
-            key={label}
+            key={f.key}
             activeOpacity={0.85}
-            onPress={() => setActiveFilter(i)}
-            style={[styles.filterChip, i === activeFilter && styles.filterChipActive]}>
-            <Text style={[styles.filterText, i === activeFilter && styles.filterTextActive]}>
-              {label}
+            onPress={() => setActiveIndex(i)}
+            style={[styles.filterChip, i === activeIndex && styles.filterChipActive]}>
+            <Text style={[styles.filterText, i === activeIndex && styles.filterTextActive]}>
+              {f.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -140,7 +136,7 @@ export function MeditationsScreen({onBack}: Props) {
         </View>
       ) : (
         <View style={styles.list}>
-          {meditations.map(m => (
+          {filtered.map(m => (
             <MeditationCard key={m.id} item={m} />
           ))}
         </View>
