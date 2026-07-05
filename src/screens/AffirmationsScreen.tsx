@@ -1,6 +1,7 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   FlatList,
   Image,
@@ -14,7 +15,11 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_AFFIRMATION, ICON_ARROW_UP, ICON_BACK} from '../assets/icons';
-import {Affirmation, useAffirmations} from '../services/affirmations';
+import {
+  Affirmation,
+  dailyAffirmationIndex,
+  useAffirmations,
+} from '../services/affirmations';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -67,6 +72,22 @@ export function AffirmationsScreen({onBack}: Props) {
       ? affirmations
       : affirmations.filter(a => a.categoryLabel === filters[activeFilter]);
 
+  // Open on the same "мысль на сегодня" the home card shows (full list only;
+  // category views start at their first card).
+  const dailyIdx =
+    activeFilter === 0 ? dailyAffirmationIndex(affirmations.length) : 0;
+  const didInitScroll = useRef(false);
+  useEffect(() => {
+    if (didInitScroll.current || affirmations.length === 0) {
+      return;
+    }
+    didInitScroll.current = true;
+    const offset = SCREEN_H * dailyAffirmationIndex(affirmations.length);
+    requestAnimationFrame(() =>
+      listRef.current?.scrollToOffset({offset, animated: false}),
+    );
+  }, [affirmations.length]);
+
   const filterTop = top + 7 + BTN_SIZE + 14;
   // Bound the affirmation text between the filter chips and the swipe hint so
   // long, multi-sentence affirmations stay centered and never overlap either.
@@ -78,8 +99,31 @@ export function AffirmationsScreen({onBack}: Props) {
     listRef.current?.scrollToOffset({offset: 0, animated: false});
   }
 
+  // The full-screen background decodes noticeably slower than the text lays
+  // out, so the text used to flash on the bare gradient first. Keep the whole
+  // screen invisible until the background reports loaded, then fade it in.
+  const fade = useRef(new Animated.Value(0)).current;
+  const onBgLoad = useCallback(() => {
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [fade]);
+
   return (
-    <View style={styles.root}>
+    <Animated.View style={[styles.root, {opacity: fade}]}>
+      {/* Single shared background — every page shows the same image, so it
+          lives behind the pager instead of inside each page. This kills the
+          re-decode flicker on category switch (the list remounts, the
+          background doesn't). */}
+      <Image
+        source={require('../assets/images/affirmation-bg.png')}
+        style={StyleSheet.absoluteFill as any}
+        resizeMode="cover"
+        onLoad={onBgLoad}
+      />
+
       {/* Vertical pager — full screen, each page one affirmation */}
       <FlatList
         ref={listRef}
@@ -95,11 +139,6 @@ export function AffirmationsScreen({onBack}: Props) {
         })}
         ListEmptyComponent={
           <View style={styles.page}>
-            <Image
-              source={require('../assets/images/affirmation-bg.png')}
-              style={StyleSheet.absoluteFill as any}
-              resizeMode="cover"
-            />
             <View
               style={[styles.textBox, {top: textBoxTop, bottom: textBoxBottom}]}>
               {loading ? (
@@ -114,11 +153,6 @@ export function AffirmationsScreen({onBack}: Props) {
         }
         renderItem={({item, index}) => (
           <View style={styles.page}>
-            <Image
-              source={require('../assets/images/affirmation-bg.png')}
-              style={StyleSheet.absoluteFill as any}
-              resizeMode="cover"
-            />
             {/* Affirmation text + icons — vertically centered, length-scaled */}
             <View
               style={[styles.textBox, {top: textBoxTop, bottom: textBoxBottom}]}>
@@ -129,8 +163,8 @@ export function AffirmationsScreen({onBack}: Props) {
                 <SvgXml xml={ICON_AFFIRMATION} width={64} height={24} />
               </View>
             </View>
-            {/* Swipe-up hint — only on the first card when the screen opens */}
-            {index === 0 && (
+            {/* Swipe-up hint — only on the initially visible card */}
+            {index === dailyIdx && (
               <View style={[styles.hint, {bottom: SCREEN_H * HINT_BOTTOM_RATIO}]}>
                 <Text style={styles.hintText}>
                   {t(
@@ -188,7 +222,7 @@ export function AffirmationsScreen({onBack}: Props) {
           </TouchableOpacity>
         ))}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

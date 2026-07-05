@@ -1,7 +1,6 @@
 import React, {useState} from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,7 +10,8 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ICON_BACK, ICON_CLOCK, ICON_MORE_HORIZONTAL, ICON_SEARCH} from '../assets/icons';
+import {ICON_BACK, ICON_CLOCK, ICON_PLAY_TRIANGLE, ICON_SEARCH} from '../assets/icons';
+import LinearGradient from '../components/LinearGradient';
 import {RemoteImage} from '../components/RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
 import {formatDuration, Meditation, useMeditations} from '../services/meditations';
@@ -20,12 +20,12 @@ import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
 const SECTION_MARGIN = 24;
-const CARD_GAP = 16;
-const CARD_W = Math.floor(
-  (Dimensions.get('window').width - SECTION_MARGIN * 2 - CARD_GAP) / 2,
-);
-const CARD_H = Math.round((CARD_W * 200) / 163);
+// Design 411:8139: full-width 342×170 cards stacked vertically, 12px apart.
+const CARD_GAP = 12;
+const CARD_H = 170;
 const CARD_RADIUS = 20;
+const CARD_PAD = 14;
+const PLAY_BTN = 50;
 const BTN_SIZE = 47;
 const BTN_RADIUS = 23.5;
 
@@ -49,19 +49,30 @@ function MeditationCard({item}: {item: Meditation}) {
   const inner = (
     <View style={styles.cardClip}>
       <RemoteImage source={{uri: item.coverUrl}} style={styles.cardBg} resizeMode="cover" />
+      <LinearGradient
+        colors={['rgba(0,0,0,0.25)', 'rgba(102,102,102,0.25)']}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
+        style={styles.cardBg}
+        pointerEvents="none"
+      />
       <View style={styles.cardContent}>
-        <View style={styles.cardTextBlock}>
-          <Text style={styles.cardTitle}>{item.title}</Text>
-          <Text style={styles.cardSubtitle} numberOfLines={2}>
-            {item.description}
-          </Text>
-        </View>
-        <View style={styles.cardFooter}>
+        <View style={styles.cardLeft}>
+          <View style={styles.cardTextBlock}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Text style={styles.cardSubtitle} numberOfLines={2}>
+              {item.description}
+            </Text>
+          </View>
           <View style={styles.timeRow}>
             <SvgXml xml={ICON_CLOCK} width={18} height={18} />
             <Text style={styles.timeText}>{formatDuration(item.durationSeconds)}</Text>
           </View>
-          <SvgXml xml={ICON_MORE_HORIZONTAL} width={24} height={24} />
+        </View>
+        <View style={styles.playBtn}>
+          <SvgXml xml={ICON_PLAY_TRIANGLE} width={16} height={16} />
         </View>
       </View>
     </View>
@@ -132,13 +143,13 @@ export function MeditationsScreen({onBack}: Props) {
         ))}
       </ScrollView>
 
-      {/* Cards grid */}
+      {/* Cards list */}
       {loading ? (
         <View style={styles.loader}>
           <ActivityIndicator color={colors.white} />
         </View>
       ) : (
-        <View style={styles.grid}>
+        <View style={styles.list}>
           {meditations.map(m => (
             <MeditationCard key={m.id} item={m} />
           ))}
@@ -258,18 +269,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Cards grid ────────────────────────────────────────────────────────────
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  // ── Cards list ────────────────────────────────────────────────────────────
+  list: {
     gap: CARD_GAP,
-    marginTop: 16,
+    marginTop: 20,
     marginHorizontal: SECTION_MARGIN,
   },
 
   // ── Meditation card ───────────────────────────────────────────────────────
   cardGlow: {
-    width: CARD_W,
     height: CARD_H,
     borderRadius: CARD_RADIUS,
     ...Platform.select({
@@ -282,7 +290,6 @@ const styles = StyleSheet.create({
     }),
   },
   cardShadow: {
-    width: CARD_W,
     height: CARD_H,
     borderRadius: CARD_RADIUS,
     ...Platform.select({
@@ -295,42 +302,42 @@ const styles = StyleSheet.create({
     }),
   },
   cardClip: {
-    width: CARD_W,
     height: CARD_H,
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
   },
   cardBg: {
     position: 'absolute',
-    width: CARD_W,
-    height: CARD_H,
-  },
-  cardContent: {
-    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 14,
+  },
+  cardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    padding: CARD_PAD,
+    gap: 10,
+  },
+  cardLeft: {
+    flex: 1,
     justifyContent: 'space-between',
   },
   cardTextBlock: {
     gap: 12,
-    flex: 1,
   },
   cardTitle: {
     ...typography.body,
     color: colors.white,
+    // Design reserves a fixed 2-line slot (42pt) so descriptions align
+    // across cards regardless of title length.
+    minHeight: 42,
   },
   cardSubtitle: {
     ...typography.small,
     color: colors.white,
     opacity: 0.65,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   timeRow: {
     flexDirection: 'row',
@@ -340,5 +347,24 @@ const styles = StyleSheet.create({
   timeText: {
     ...typography.small,
     color: colors.white,
+  },
+  playBtn: {
+    width: PLAY_BTN,
+    height: PLAY_BTN,
+    borderRadius: PLAY_BTN / 2,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 8},
+        shadowOpacity: 0.2,
+        shadowRadius: 32,
+      },
+    }),
   },
 });

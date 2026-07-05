@@ -30,6 +30,16 @@ export type Affirmation = {
   categoryLabel: string; // localized chip label, e.g. 'Спокойствие'
 };
 
+/** Index of today's "мысль на сегодня" — rotates once per calendar day.
+ *  Shared by the home card and the affirmations pager so both show the
+ *  same affirmation. */
+export function dailyAffirmationIndex(count: number): number {
+  if (count <= 0) {
+    return 0;
+  }
+  return Math.floor(Date.now() / 86400000) % count;
+}
+
 export function useAffirmations() {
   const [affirmations, setAffirmations] = useState<Affirmation[]>([]);
   const [loading, setLoading] = useState(true);

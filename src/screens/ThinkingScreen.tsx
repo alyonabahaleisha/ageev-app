@@ -24,7 +24,7 @@ import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
 const SECTION_MARGIN = 24;
-const CARD_GAP = 16;
+const CARD_GAP = 12;
 const CARD_W = Math.floor((Dimensions.get('window').width - SECTION_MARGIN * 2 - CARD_GAP) / 2);
 const CARD_H = Math.round(CARD_W * 140 / 163);
 const CARD_RADIUS = 20;
@@ -217,6 +217,7 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: CARD_GAP,
   },
   cardBlueGlow: {
@@ -250,6 +251,8 @@ const styles = StyleSheet.create({
     height: CARD_H,
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   cardBg: {
     position: 'absolute',
@@ -260,7 +263,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: CARD_W,
     height: CARD_H,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   cardLabelWrap: {
     position: 'absolute',

@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,32 +11,30 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ICON_BACK, ICON_CLOCK, ICON_PLAY_TRIANGLE, ICON_SEARCH} from '../assets/icons';
+import {ICON_BACK, ICON_CLOCK, ICON_SEARCH} from '../assets/icons';
 import LinearGradient from '../components/LinearGradient';
 import {RemoteImage} from '../components/RemoteImage';
-import {formatDuration} from '../services/meditations';
-import {Webinar, useWebinars} from '../services/webinars';
 import {usePlayer} from '../context/PlayerContext';
+import {Breakfast, useBreakfasts} from '../services/breakfasts';
+import {formatDuration} from '../services/meditations';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
 
 const SECTION_MARGIN = 24;
-// Design 411:8176: full-width 342×170 cards stacked vertically, 12px apart.
 const CARD_GAP = 12;
-const CARD_H = 170;
+// Design (411:8213): square 165×165 cards, two per row in a 342pt column.
+const CARD_W = Math.floor(
+  (Dimensions.get('window').width - SECTION_MARGIN * 2 - CARD_GAP) / 2,
+);
 const CARD_RADIUS = 20;
-const CARD_PAD = 14;
-const PLAY_BTN = 50;
 const BTN_SIZE = 47;
 const BTN_RADIUS = 23.5;
 
 const DEFAULT_FILTERS =
   'Все, Короткие, Длинные, Спокойствие, Тревога, Любовь, Энергия, Изобилие, Уверенность, Принятие';
 
-type Props = {onBack: () => void};
-
-function WebinarCard({item}: {item: Webinar}) {
+function BreakfastCard({item}: {item: Breakfast}) {
   const {openPlayer} = usePlayer();
   const onPress = () =>
     openPlayer({
@@ -49,7 +48,13 @@ function WebinarCard({item}: {item: Webinar}) {
 
   const inner = (
     <View style={styles.cardClip}>
-      <RemoteImage source={{uri: item.coverUrl}} style={styles.cardBg} resizeMode="cover" />
+      {!!item.coverUrl && (
+        <RemoteImage
+          source={{uri: item.coverUrl}}
+          style={styles.cardBg}
+          resizeMode="cover"
+        />
+      )}
       <LinearGradient
         colors={['rgba(0,0,0,0.25)', 'rgba(102,102,102,0.25)']}
         start={{x: 0, y: 0}}
@@ -57,24 +62,18 @@ function WebinarCard({item}: {item: Webinar}) {
         style={styles.cardBg}
         pointerEvents="none"
       />
-      <View style={styles.cardContent}>
-        <View style={styles.cardLeft}>
-          <View style={styles.cardTextBlock}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
-              {item.title}
-            </Text>
-            <Text style={styles.cardSubtitle} numberOfLines={2}>
-              {item.description}
-            </Text>
-          </View>
+      <View style={styles.cardInner}>
+        <Text style={styles.cardTitle} numberOfLines={4}>
+          {item.title}
+        </Text>
+        {item.durationSeconds > 0 && (
           <View style={styles.timeRow}>
             <SvgXml xml={ICON_CLOCK} width={18} height={18} />
-            <Text style={styles.timeText}>{formatDuration(item.durationSeconds)}</Text>
+            <Text style={styles.timeText}>
+              {formatDuration(item.durationSeconds)}
+            </Text>
           </View>
-        </View>
-        <View style={styles.playBtn}>
-          <SvgXml xml={ICON_PLAY_TRIANGLE} width={16} height={16} />
-        </View>
+        )}
       </View>
     </View>
   );
@@ -88,18 +87,23 @@ function WebinarCard({item}: {item: Webinar}) {
   }
 
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.cardGlow}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onPress}
+      style={styles.cardGlow}>
       <View style={styles.cardShadow}>{inner}</View>
     </TouchableOpacity>
   );
 }
 
-export function WebinarsScreen({onBack}: Props) {
+type Props = {onBack: () => void};
+
+export function BreakfastsScreen({onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState(0);
-  const {webinars, loading} = useWebinars();
+  const {breakfasts, loading} = useBreakfasts();
   const t = useUIStrings();
-  const filters = t('webinars_filters', DEFAULT_FILTERS)
+  const filters = t('breakfasts_filters', DEFAULT_FILTERS)
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
@@ -122,8 +126,10 @@ export function WebinarsScreen({onBack}: Props) {
         </View>
       </View>
 
-      {/* Title */}
-      <Text style={styles.title}>{t('webinars_title', 'Вебинары')}</Text>
+      {/* Title — centered H2 per design */}
+      <Text style={styles.title}>
+        {t('breakfasts_title', 'Духовные завтраки')}
+      </Text>
 
       {/* Filter chips */}
       <ScrollView
@@ -144,15 +150,15 @@ export function WebinarsScreen({onBack}: Props) {
         ))}
       </ScrollView>
 
-      {/* Cards list */}
+      {/* Cards grid */}
       {loading ? (
         <View style={styles.loader}>
           <ActivityIndicator color={colors.white} />
         </View>
       ) : (
-        <View style={styles.list}>
-          {webinars.map(w => (
-            <WebinarCard key={w.id} item={w} />
+        <View style={styles.grid}>
+          {breakfasts.map(b => (
+            <BreakfastCard key={b.id} item={b} />
           ))}
         </View>
       )}
@@ -215,15 +221,16 @@ const styles = StyleSheet.create({
     }),
   },
 
-  // ── Title ─────────────────────────────────────────────────────────────────
+  // ── Title ────────────────────────────────────────────────────────────────
   title: {
     ...typography.h2,
     color: colors.white,
     textAlign: 'center',
     marginTop: 18,
+    marginHorizontal: SECTION_MARGIN,
   },
 
-  // ── Filter chips ──────────────────────────────────────────────────────────
+  // ── Filter chips ─────────────────────────────────────────────────────────
   filtersScroll: {
     marginTop: 16,
     flexGrow: 0,
@@ -263,23 +270,19 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
 
+  // ── Cards grid ───────────────────────────────────────────────────────────
   loader: {
-    marginTop: 16,
-    paddingHorizontal: SECTION_MARGIN,
     paddingVertical: 40,
     alignItems: 'center',
   },
-
-  // ── Cards list ────────────────────────────────────────────────────────────
-  list: {
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: CARD_GAP,
     marginTop: 20,
     marginHorizontal: SECTION_MARGIN,
   },
-
-  // ── Webinar card ──────────────────────────────────────────────────────────
   cardGlow: {
-    height: CARD_H,
     borderRadius: CARD_RADIUS,
     ...Platform.select({
       ios: {
@@ -291,7 +294,6 @@ const styles = StyleSheet.create({
     }),
   },
   cardShadow: {
-    height: CARD_H,
     borderRadius: CARD_RADIUS,
     ...Platform.select({
       ios: {
@@ -303,42 +305,27 @@ const styles = StyleSheet.create({
     }),
   },
   cardClip: {
-    height: CARD_H,
+    width: CARD_W,
+    height: CARD_W,
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.12)',
   },
   cardBg: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    width: CARD_W,
+    height: CARD_W,
   },
-  cardContent: {
+  cardInner: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    padding: CARD_PAD,
-    gap: 10,
-  },
-  cardLeft: {
-    flex: 1,
+    padding: 14,
     justifyContent: 'space-between',
-  },
-  cardTextBlock: {
-    gap: 12,
   },
   cardTitle: {
     ...typography.body,
     color: colors.white,
-    // Design reserves a fixed 2-line slot (42pt) so descriptions align
-    // across cards regardless of title length.
-    minHeight: 42,
-  },
-  cardSubtitle: {
-    ...typography.small,
-    color: colors.white,
-    opacity: 0.65,
+    textAlign: 'left',
+    maxWidth: 135,
   },
   timeRow: {
     flexDirection: 'row',
@@ -348,24 +335,5 @@ const styles = StyleSheet.create({
   timeText: {
     ...typography.small,
     color: colors.white,
-  },
-  playBtn: {
-    width: PLAY_BTN,
-    height: PLAY_BTN,
-    borderRadius: PLAY_BTN / 2,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: {width: 0, height: 8},
-        shadowOpacity: 0.2,
-        shadowRadius: 32,
-      },
-    }),
   },
 });

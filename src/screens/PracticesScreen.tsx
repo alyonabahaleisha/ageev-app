@@ -16,8 +16,10 @@ import {PracticeCards} from '../components/PracticeCards';
 import {MeditationsScreen} from './MeditationsScreen';
 import {WebinarsScreen} from './WebinarsScreen';
 import {AffirmationsScreen} from './AffirmationsScreen';
+import {BreakfastsScreen} from './BreakfastsScreen';
 import {GradientBackground} from '../components/GradientBackground';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {useBreakfasts} from '../services/breakfasts';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -55,11 +57,11 @@ const FORMATS = [
     iconH: 23,
   },
   {
-    id: 'music',
-    label: 'Музыка',
-    icon: require('../assets/images/format-music-56586c-56586a.png'),
+    id: 'breakfasts',
+    label: 'Духовные завтраки',
+    icon: require('../assets/images/format-breakfast.png'),
     iconW: 30,
-    iconH: 30,
+    iconH: 31,
   },
 ];
 
@@ -97,10 +99,13 @@ function FormatChip({
 export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
   const {top, bottom} = useSafeAreaInsets();
   const [subScreen, setSubScreen] = useState<
-    'list' | 'meditations' | 'affirmations' | 'webinars'
+    'list' | 'meditations' | 'affirmations' | 'webinars' | 'breakfasts'
   >('list');
   const scrollRef = useRef<ScrollView>(null);
   const t = useUIStrings();
+  // Warm the breakfast list + cover cache from app launch (this tab is always
+  // mounted), so the Завтраки grid opens with its images already cached.
+  useBreakfasts();
 
   useEffect(() => {
     setSubScreen('list');
@@ -145,6 +150,8 @@ export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
                     ? () => setSubScreen('affirmations')
                     : f.id === 'webinars'
                     ? () => setSubScreen('webinars')
+                    : f.id === 'breakfasts'
+                    ? () => setSubScreen('breakfasts')
                     : undefined
                 }
               />
@@ -178,6 +185,12 @@ export function PracticesScreen({resetSignal = 0}: {resetSignal?: number}) {
       {subScreen === 'webinars' && (
         <GradientBackground style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
           <WebinarsScreen onBack={() => setSubScreen('list')} />
+        </GradientBackground>
+      )}
+
+      {subScreen === 'breakfasts' && (
+        <GradientBackground style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
+          <BreakfastsScreen onBack={() => setSubScreen('list')} />
         </GradientBackground>
       )}
 
