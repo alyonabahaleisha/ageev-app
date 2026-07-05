@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ICON_BACK, ICON_SEARCH, ICON_EXPAND, ICON_CLOSE} from '../assets/icons';
+import {ICON_BACK, ICON_SEARCH, ICON_EXPAND} from '../assets/icons';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
 import LinearGradient from '../components/LinearGradient';
@@ -105,13 +105,14 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
             style={styles.cardShadow}>
             <View style={styles.card}>
               <Image
-                source={require('../assets/images/clubs-map.png')}
+                source={require('../assets/images/clubs-map-preview.jpg')}
                 style={StyleSheet.absoluteFill}
                 resizeMode="cover"
               />
-              {/* Top→bottom darkening so the text stays legible. */}
+              {/* Top→bottom darkening so the text stays legible (design:
+                  180deg, grey 20% → black 50%). */}
               <LinearGradient
-                colors={['rgba(102,102,102,0.4)', 'rgba(0,0,0,1)']}
+                colors={['rgba(102,102,102,0.2)', 'rgba(0,0,0,0.5)']}
                 start={{x: 0.5, y: 0}}
                 end={{x: 0.5, y: 1}}
                 style={StyleSheet.absoluteFill}
@@ -210,18 +211,20 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
         </GradientBackground>
       )}
 
-      {/* Fixed header — title + close button (right) */}
-      <FixedHeader>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('clubs_title', 'Клуб')}</Text>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={onClose}
-            style={styles.closeBtn}>
-            <SvgXml xml={ICON_CLOSE} width={24} height={24} />
-          </TouchableOpacity>
-        </View>
-      </FixedHeader>
+      {/* Fixed header — search button only, per design (411:7349) */}
+      {!searchActive && (
+        <FixedHeader>
+          <View style={styles.header}>
+            <View />
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setSearchActive(true)}
+              style={styles.closeBtn}>
+              <SvgXml xml={ICON_SEARCH} width={24} height={24} />
+            </TouchableOpacity>
+          </View>
+        </FixedHeader>
+      )}
     </>
   );
 }
@@ -254,7 +257,7 @@ const styles = StyleSheet.create({
 
   // ── Intro ────────────────────────────────────────────────────────────────
   intro: {
-    marginTop: 16,
+    marginTop: 18,
     marginHorizontal: SECTION_MARGIN,
     gap: 12,
   },
