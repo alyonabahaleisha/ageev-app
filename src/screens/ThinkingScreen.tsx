@@ -217,7 +217,6 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: CARD_GAP,
   },
   cardBlueGlow: {
