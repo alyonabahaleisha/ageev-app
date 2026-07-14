@@ -37,6 +37,7 @@ function WebinarCard({card}: {card: Webinar}) {
         audioUrl: card.audioUrl,
         coverUrl: card.coverUrl,
         durationSeconds: card.durationSeconds,
+        kind: 'webinar',
       })}>
       <View style={styles.cardClip}>
         <RemoteImage

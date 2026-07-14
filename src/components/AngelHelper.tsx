@@ -15,6 +15,7 @@ import {
   MindsetState,
   useMindsetStates,
 } from '../services/mindsetStates';
+import {useAppSettings} from '../services/settings';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 
@@ -65,7 +66,13 @@ function StateCard({
 export function AngelHelper({onOpenState}: Props) {
   const {states} = useMindsetStates();
   const visibleStates = states.filter(hasStateContent);
+  const {settings} = useAppSettings();
   const t = useUIStrings();
+
+  // Выключен в настройках («Показывать на главном экране»).
+  if (!settings.angelOnHome) {
+    return null;
+  }
 
   // Nothing configured yet — hide the section rather than show an empty pill.
   if (visibleStates.length === 0) {

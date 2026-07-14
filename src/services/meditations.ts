@@ -19,7 +19,10 @@ export type Meditation = {
   id: string;
   title: string;
   description: string;
+  /** Легаси-поле (первая сфера); актуальный список — в `areas`. */
   area: LifeArea;
+  /** Сферы жизни (может быть несколько). */
+  areas?: string[];
   fileName: string;
   durationSeconds: number;
   audioUrl: string;

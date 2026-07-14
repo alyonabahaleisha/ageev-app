@@ -14,12 +14,25 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ICON_AFFIRMATION, ICON_ARROW_UP, ICON_BACK} from '../assets/icons';
+import {
+  ICON_ARROW_UP,
+  ICON_BACK,
+  ICON_HEART_FILLED,
+  ICON_STORY_HEART,
+  ICON_STORY_SHARE,
+} from '../assets/icons';
 import {
   Affirmation,
   dailyAffirmationIndex,
   useAffirmations,
 } from '../services/affirmations';
+import {SavedToast, useSavedToast} from '../components/SavedToast';
+import {
+  ShareAffirmationItem,
+  ShareAffirmationModal,
+} from '../components/ShareAffirmation';
+import {useFavorites} from '../services/favorites';
+import {TEXT_SCALES, useAppSettings} from '../services/settings';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -36,22 +49,42 @@ const ALL_FILTER = 'Все';
 // Scale the font to the affirmation length with a proportional line height.
 // (We avoid `adjustsFontSizeToFit`: on iOS it shrinks the font but keeps the
 // fixed lineHeight, producing tiny text with huge line gaps.)
-function fontForText(text: string): {fontSize: number; lineHeight: number} {
+// `scale` — пользовательский «Размер текста» из настроек.
+function fontForText(
+  text: string,
+  scale: number,
+): {fontSize: number; lineHeight: number} {
   const len = text.length;
-  if (len <= 60) return {fontSize: 26, lineHeight: 34};
-  if (len <= 120) return {fontSize: 23, lineHeight: 31};
-  if (len <= 220) return {fontSize: 20, lineHeight: 27};
-  if (len <= 340) return {fontSize: 18, lineHeight: 24};
-  return {fontSize: 16, lineHeight: 22};
+  let f: {fontSize: number; lineHeight: number};
+  if (len <= 60) f = {fontSize: 26, lineHeight: 34};
+  else if (len <= 120) f = {fontSize: 23, lineHeight: 31};
+  else if (len <= 220) f = {fontSize: 20, lineHeight: 27};
+  else if (len <= 340) f = {fontSize: 18, lineHeight: 24};
+  else f = {fontSize: 16, lineHeight: 22};
+  return {
+    fontSize: Math.round(f.fontSize * scale),
+    lineHeight: Math.round(f.lineHeight * scale),
+  };
 }
 
-type Props = {onBack: () => void};
+type Props = {
+  onBack: () => void;
+  /** Открыть пейджер сразу на этой аффирмации (переход из «Избранного»). */
+  initial?: {id?: string; text?: string};
+};
 
-export function AffirmationsScreen({onBack}: Props) {
+export function AffirmationsScreen({onBack, initial}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState(0);
+  const [shareItem, setShareItem] = useState<ShareAffirmationItem | null>(
+    null,
+  );
   const listRef = useRef<FlatList<Affirmation>>(null);
   const {affirmations, loading} = useAffirmations();
+  const {isFavorite, toggleFavorite} = useFavorites();
+  const toast = useSavedToast();
+  const {settings} = useAppSettings();
+  const textScale = TEXT_SCALES[settings.textSize];
   const t = useUIStrings();
   const allLabel = t('affirmations_filter_all', ALL_FILTER);
 
@@ -73,7 +106,9 @@ export function AffirmationsScreen({onBack}: Props) {
       : affirmations.filter(a => a.categoryLabel === filters[activeFilter]);
 
   // Open on the same "мысль на сегодня" the home card shows (full list only;
-  // category views start at their first card).
+  // category views start at their first card). Opening from «Избранное»
+  // starts on the saved affirmation instead — matched by id, with a text
+  // fallback for items saved from state screens.
   const dailyIdx =
     activeFilter === 0 ? dailyAffirmationIndex(affirmations.length) : 0;
   const didInitScroll = useRef(false);
@@ -82,11 +117,19 @@ export function AffirmationsScreen({onBack}: Props) {
       return;
     }
     didInitScroll.current = true;
-    const offset = SCREEN_H * dailyAffirmationIndex(affirmations.length);
+    let idx = -1;
+    if (initial) {
+      idx = affirmations.findIndex(a => a.id === initial.id);
+      if (idx < 0 && initial.text) {
+        idx = affirmations.findIndex(a => a.text === initial.text);
+      }
+    }
+    if (idx < 0) idx = dailyAffirmationIndex(affirmations.length);
+    const offset = SCREEN_H * idx;
     requestAnimationFrame(() =>
       listRef.current?.scrollToOffset({offset, animated: false}),
     );
-  }, [affirmations.length]);
+  }, [affirmations, initial]);
 
   const filterTop = top + 7 + BTN_SIZE + 14;
   // Bound the affirmation text between the filter chips and the swipe hint so
@@ -156,11 +199,39 @@ export function AffirmationsScreen({onBack}: Props) {
             {/* Affirmation text + icons — vertically centered, length-scaled */}
             <View
               style={[styles.textBox, {top: textBoxTop, bottom: textBoxBottom}]}>
-              <Text style={[styles.affirmationText, fontForText(item.text)]}>
+              <Text
+                style={[styles.affirmationText, fontForText(item.text, textScale)]}>
                 {item.text}
               </Text>
               <View style={styles.actionsRow}>
-                <SvgXml xml={ICON_AFFIRMATION} width={64} height={24} />
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                  onPress={() => {
+                    const added = !isFavorite('affirmation', item.id);
+                    toggleFavorite({
+                      kind: 'affirmation',
+                      id: item.id,
+                      title: item.text,
+                    });
+                    toast.onToggled(added);
+                  }}>
+                  <SvgXml
+                    xml={
+                      isFavorite('affirmation', item.id)
+                        ? ICON_HEART_FILLED
+                        : ICON_STORY_HEART
+                    }
+                    width={24}
+                    height={24}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                  onPress={() => setShareItem({text: item.text})}>
+                  <SvgXml xml={ICON_STORY_SHARE} width={24} height={24} />
+                </TouchableOpacity>
               </View>
             </View>
             {/* Swipe-up hint — only on the initially visible card */}
@@ -186,8 +257,7 @@ export function AffirmationsScreen({onBack}: Props) {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={onBack}
-          style={styles.backBtn}
-          pointerEvents="auto">
+          style={styles.backBtn}>
           <SvgXml xml={ICON_BACK} width={24} height={24} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
@@ -222,6 +292,15 @@ export function AffirmationsScreen({onBack}: Props) {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* «Сохранено» — как в плеере (448:13206), поверх шапки */}
+      {toast.visible && <SavedToast top={top + 7} onClose={toast.hide} />}
+
+      {/* «Поделиться» (448:10293) */}
+      <ShareAffirmationModal
+        item={shareItem}
+        onClose={() => setShareItem(null)}
+      />
     </Animated.View>
   );
 }
@@ -253,6 +332,9 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     marginTop: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   hint: {
     position: 'absolute',

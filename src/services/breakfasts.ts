@@ -13,6 +13,8 @@ export type Breakfast = {
   coverUrl: string;
   sortOrder: number;
   area?: string;
+  /** Сферы жизни (может быть несколько). */
+  areas?: string[];
 };
 
 export function useBreakfasts() {

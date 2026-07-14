@@ -5,7 +5,9 @@ import {db} from '../lib/firebase';
 // In Firestore, each document in `affirmations` is a category: the doc id is
 // the category key (same keys as meditation LifeArea) and the only field is
 // `texts: string[]` — the affirmations for that category. We flatten those
-// into individual items for the pager.
+// into individual items for the pager. Category labels come live from the
+// CMS `lifeAreas` collection (the «Сферы жизни» admin section), with these
+// built-ins as fallback for areas not configured there.
 export const AFFIRMATION_CATEGORIES: {key: string; label: string}[] = [
   {key: 'calm', label: 'Спокойствие'},
   {key: 'fear', label: 'Тревога'},
@@ -22,6 +24,8 @@ export const AFFIRMATION_CATEGORIES: {key: string; label: string}[] = [
 const LABEL_BY_KEY: Record<string, string> = Object.fromEntries(
   AFFIRMATION_CATEGORIES.map(c => [c.key, c.label]),
 );
+
+type AreaDoc = {label?: string; sortOrder?: number};
 
 export type Affirmation = {
   id: string;
@@ -44,6 +48,25 @@ export function useAffirmations() {
   const [affirmations, setAffirmations] = useState<Affirmation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [areas, setAreas] = useState<Record<string, AreaDoc>>({});
+
+  // Названия и порядок сфер — из CMS, чтобы переименования в разделе
+  // «Сферы жизни» сразу отражались на чипах категорий.
+  useEffect(
+    () =>
+      onSnapshot(
+        collection(db, 'lifeAreas'),
+        snap => {
+          const m: Record<string, AreaDoc> = {};
+          snap.docs.forEach(d => {
+            m[d.id] = d.data() as AreaDoc;
+          });
+          setAreas(m);
+        },
+        () => {},
+      ),
+    [],
+  );
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -59,14 +82,20 @@ export function useAffirmations() {
           }
         });
 
-        // Known categories first (in our defined order), then any extras.
+        // CMS sortOrder first; known built-ins keep their defined order as a
+        // tiebreaker, unknown extras go last.
         const knownKeys = AFFIRMATION_CATEGORIES.map(c => c.key);
-        const orderedKeys = [
-          ...knownKeys.filter(k => byKey[k]?.length),
-          ...Object.keys(byKey).filter(
-            k => !knownKeys.includes(k) && byKey[k].length,
-          ),
-        ];
+        const orderedKeys = Object.keys(byKey)
+          .filter(k => byKey[k].length)
+          .sort((a, b) => {
+            const fallback = (k: string) => {
+              const i = knownKeys.indexOf(k);
+              return i >= 0 ? 500 + i : 900;
+            };
+            const sa = areas[a]?.sortOrder ?? fallback(a);
+            const sb = areas[b]?.sortOrder ?? fallback(b);
+            return sa - sb;
+          });
 
         const flat: Affirmation[] = [];
         orderedKeys.forEach(key => {
@@ -75,7 +104,7 @@ export function useAffirmations() {
               id: `${key}-${i}`,
               text,
               category: key,
-              categoryLabel: LABEL_BY_KEY[key] ?? key,
+              categoryLabel: areas[key]?.label || LABEL_BY_KEY[key] || key,
             });
           });
         });
@@ -89,7 +118,7 @@ export function useAffirmations() {
       },
     );
     return unsub;
-  }, []);
+  }, [areas]);
 
   return {affirmations, loading, error};
 }

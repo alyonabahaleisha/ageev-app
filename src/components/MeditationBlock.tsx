@@ -34,6 +34,7 @@ function MeditationCard({item}: {item: Meditation}) {
         audioUrl: item.audioUrl,
         coverUrl: item.coverUrl,
         durationSeconds: item.durationSeconds,
+        kind: 'meditation',
       })}>
       <View style={styles.cardShadow}>
         <View style={styles.cardClip}>

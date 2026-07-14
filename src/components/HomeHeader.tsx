@@ -9,6 +9,7 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {ICON_USER, ICON_SEARCH} from '../assets/icons';
 import {useSearch} from '../context/SearchContext';
+import {useAuth, userDisplayName} from '../context/AuthContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -24,7 +25,11 @@ type Props = {
 export function HomeHeader({name}: Props) {
   const t = useUIStrings();
   const {openSearch} = useSearch();
-  const displayName = name || t('home_header_name', 'Михаил');
+  const {user} = useAuth();
+  // Вошедший пользователь видит своё имя; у гостя строки с именем нет —
+  // тогда и запятая в приветствии лишняя.
+  const displayName = name || (user ? userDisplayName(user) : '');
+  const welcome = t('home_header_welcome', 'Добро пожаловать,');
   return (
     <View style={styles.container}>
       {/* Left: avatar + greeting */}
@@ -39,11 +44,13 @@ export function HomeHeader({name}: Props) {
         </View>
         <View style={styles.textBlock}>
           <Text style={styles.welcomeText} numberOfLines={1}>
-            {t('home_header_welcome', 'Добро пожаловать,')}
+            {displayName ? welcome : welcome.replace(/,\s*$/, '')}
           </Text>
-          <Text style={styles.nameText} numberOfLines={1}>
-            {displayName}
-          </Text>
+          {!!displayName && (
+            <Text style={styles.nameText} numberOfLines={1}>
+              {displayName}
+            </Text>
+          )}
         </View>
       </View>
 

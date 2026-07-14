@@ -5,7 +5,6 @@ import {
   Linking,
   Platform,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,6 +18,7 @@ import {
   ICON_CLOCK,
   ICON_CLOSE,
   ICON_HEART,
+  ICON_HEART_FILLED,
   ICON_PLAY_TRIANGLE,
   ICON_SHARE,
 } from '../assets/icons';
@@ -32,6 +32,12 @@ import {
   MindsetState,
   MindsetStateExercise,
 } from '../services/mindsetStates';
+import {SavedToast, useSavedToast} from '../components/SavedToast';
+import {
+  ShareAffirmationItem,
+  ShareAffirmationModal,
+} from '../components/ShareAffirmation';
+import {useFavorites} from '../services/favorites';
 import {formatDuration, useMeditations} from '../services/meditations';
 import {loadStateProgress, saveStateProgress} from '../services/stateProgress';
 import {useUIStrings} from '../services/uiStrings';
@@ -169,7 +175,11 @@ export function StateScreen({state, onBack}: Props) {
   const {webinars} = useWebinars();
   const [flowOpen, setFlowOpen] = useState(false);
   const [exerciseOpen, setExerciseOpen] = useState(false);
-  const [liked, setLiked] = useState<Record<number, boolean>>({});
+  const {isFavorite, toggleFavorite} = useFavorites();
+  const toast = useSavedToast();
+  const [shareItem, setShareItem] = useState<ShareAffirmationItem | null>(
+    null,
+  );
 
   const stateMeditations = useMemo(
     () =>
@@ -340,17 +350,39 @@ export function StateScreen({state, onBack}: Props) {
                         <TouchableOpacity
                           activeOpacity={0.7}
                           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-                          onPress={() =>
-                            setLiked(prev => ({...prev, [i]: !prev[i]}))
-                          }
-                          style={liked[i] ? undefined : styles.iconDim}>
-                          <SvgXml xml={ICON_HEART} width={24} height={24} />
+                          onPress={() => {
+                            const added = !isFavorite(
+                              'affirmation',
+                              `${state.id}_aff_${i}`,
+                            );
+                            toggleFavorite({
+                              kind: 'affirmation',
+                              id: `${state.id}_aff_${i}`,
+                              title: a.text,
+                              coverUrl: cardBg,
+                            });
+                            toast.onToggled(added);
+                          }}
+                          style={
+                            isFavorite('affirmation', `${state.id}_aff_${i}`)
+                              ? undefined
+                              : styles.iconDim
+                          }>
+                          <SvgXml
+                            xml={
+                              isFavorite('affirmation', `${state.id}_aff_${i}`)
+                                ? ICON_HEART_FILLED
+                                : ICON_HEART
+                            }
+                            width={24}
+                            height={24}
+                          />
                         </TouchableOpacity>
                         <TouchableOpacity
                           activeOpacity={0.7}
                           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
                           onPress={() =>
-                            Share.share({message: a.text}).catch(() => {})
+                            setShareItem({text: a.text, backgroundUrl: cardBg})
                           }
                           style={styles.iconDim}>
                           <SvgXml xml={ICON_SHARE} width={24} height={24} />
@@ -399,6 +431,7 @@ export function StateScreen({state, onBack}: Props) {
                     audioUrl: state.breakfastUrl,
                     coverUrl: state.coverImage,
                     durationSeconds: 0,
+                    kind: 'breakfast',
                   })
                 }
               />
@@ -451,6 +484,7 @@ export function StateScreen({state, onBack}: Props) {
                       audioUrl: m.audioUrl,
                       coverUrl: m.coverUrl,
                       durationSeconds: m.durationSeconds,
+                      kind: 'meditation',
                     });
                   }}
                 />
@@ -482,6 +516,7 @@ export function StateScreen({state, onBack}: Props) {
                       audioUrl: w.audioUrl,
                       coverUrl: w.coverUrl,
                       durationSeconds: w.durationSeconds,
+                      kind: 'webinar',
                     });
                   }}
                 />
@@ -533,6 +568,15 @@ export function StateScreen({state, onBack}: Props) {
           onClose={() => setExerciseOpen(false)}
         />
       )}
+
+      {/* «Сохранено» — как в плеере (448:13206), поверх шапки */}
+      {toast.visible && <SavedToast top={top + 7} onClose={toast.hide} />}
+
+      {/* «Поделиться» (448:10293) */}
+      <ShareAffirmationModal
+        item={shareItem}
+        onClose={() => setShareItem(null)}
+      />
     </GradientBackground>
   );
 }

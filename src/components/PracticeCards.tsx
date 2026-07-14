@@ -40,6 +40,7 @@ function PracticeCard({card}: {card: RecommendedCard}) {
         audioUrl: card.audioUrl,
         coverUrl: card.coverUrl,
         durationSeconds: card.durationSeconds,
+        kind: card.source,
       })}>
       <View style={styles.cardClip}>
         <RemoteImage

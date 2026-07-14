@@ -11,6 +11,17 @@ type AreaDoc = {label?: string; sortOrder?: number};
 export type ContentFilter = {key: string; label: string};
 
 /**
+ * Сферы жизни элемента: мульти-поле `areas`, а для старых документов —
+ * одиночное `area`. Контент может принадлежать нескольким сферам сразу.
+ */
+export function itemAreas(i: {area?: string; areas?: string[]}): string[] {
+  if (i.areas && i.areas.length) {
+    return i.areas;
+  }
+  return i.area ? [i.area] : [];
+}
+
+/**
  * Filter chips for the meditation/webinar/breakfast lists.
  * «Все / Короткие / Длинные» filter by duration; the rest of the chips are
  * the life spheres actually present in the content (labels come live from
@@ -19,7 +30,7 @@ export type ContentFilter = {key: string; label: string};
  * duration chips appear only when durations are known.
  */
 export function useContentFilters<
-  T extends {area?: string; durationSeconds: number},
+  T extends {area?: string; areas?: string[]; durationSeconds: number},
 >(items: T[]) {
   const [areas, setAreas] = useState<Record<string, AreaDoc>>({});
   const [activeIndex, setActiveIndex] = useState(0);
@@ -44,9 +55,7 @@ export function useContentFilters<
   const presentAreas = useMemo(() => {
     const seen = new Set<string>();
     items.forEach(i => {
-      if (i.area) {
-        seen.add(i.area);
-      }
+      itemAreas(i).forEach(a => seen.add(a));
     });
     return [...seen].sort(
       (a, b) => (areas[a]?.sortOrder ?? 999) - (areas[b]?.sortOrder ?? 999),
@@ -84,7 +93,7 @@ export function useContentFilters<
     if (active.key === '__long') {
       return items.filter(i => i.durationSeconds > SHORT_MAX_SECONDS);
     }
-    return items.filter(i => i.area === active.key);
+    return items.filter(i => itemAreas(i).includes(active.key));
   }, [items, active]);
 
   return {filters, activeIndex, setActiveIndex, filtered};

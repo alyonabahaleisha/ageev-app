@@ -1,5 +1,11 @@
 import {initializeApp, getApps} from 'firebase/app';
 import {Firestore, getFirestore, initializeFirestore} from 'firebase/firestore';
+import {Auth, getAuth, initializeAuth} from 'firebase/auth';
+// @ts-ignore — getReactNativePersistence живёт в RN-сборке @firebase/auth,
+// которую Metro подхватывает по exports-условию "react-native", но публичные
+// типы firebase/auth её не объявляют.
+import {getReactNativePersistence} from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCNUmsy_RQklwyvD2MK8GZZpFxPYY8YYI0',
@@ -24,3 +30,16 @@ try {
 }
 
 export const db = firestore;
+
+// Auth with AsyncStorage persistence so the session survives app restarts.
+// Same hot-reload guard as Firestore above.
+let authInstance: Auth;
+try {
+  authInstance = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch {
+  authInstance = getAuth(app);
+}
+
+export const auth = authInstance;

@@ -45,6 +45,7 @@ function WebinarCard({item}: {item: Webinar}) {
       audioUrl: item.audioUrl,
       coverUrl: item.coverUrl,
       durationSeconds: item.durationSeconds,
+      kind: 'webinar',
     });
 
   const inner = (

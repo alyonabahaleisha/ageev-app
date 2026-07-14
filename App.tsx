@@ -3,13 +3,14 @@ import {Animated, ScrollView, StatusBar, StyleSheet, View} from 'react-native';
 import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
 import TrackPlayer from 'react-native-track-player';
 import {PlaybackService} from './src/services/playbackService';
-import {PlayerProvider} from './src/context/PlayerContext';
+import {PlayerProvider, usePlayer} from './src/context/PlayerContext';
 import {PlayerScreen} from './src/screens/PlayerScreen';
 import {GradientBackground} from './src/components/GradientBackground';
 import {SplashScreen} from './src/components/SplashScreen';
 import {BottomNavBar} from './src/components/BottomNavBar';
 import {HomeHeader} from './src/components/HomeHeader';
 import {FixedHeader, headerScrollPadding} from './src/components/FixedHeader';
+import {MiniPlayer} from './src/components/MiniPlayer';
 import {AboutAppBlock} from './src/components/AboutAppBlock';
 import {AffirmationCard} from './src/components/AffirmationCard';
 import {AngelHelper} from './src/components/AngelHelper';
@@ -27,6 +28,19 @@ import {SchoolScreen} from './src/screens/SchoolScreen';
 import {ClubScreen} from './src/screens/ClubScreen';
 import {ClubMapScreen} from './src/screens/ClubMapScreen';
 import {StoriesScreen} from './src/screens/StoriesScreen';
+import {SearchScreen, SearchCategory} from './src/screens/SearchScreen';
+import {SearchContext} from './src/context/SearchContext';
+import {ProfileScreen} from './src/screens/ProfileScreen';
+import {FavoritesScreen} from './src/screens/FavoritesScreen';
+import {SettingsScreen} from './src/screens/SettingsScreen';
+import {AuthScreen} from './src/screens/AuthScreen';
+import {WelcomeScreen} from './src/screens/WelcomeScreen';
+import {AuthProvider} from './src/context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {registerOpenFavoritesHandler} from './src/services/appNavigation';
+import {FavoriteItem} from './src/services/favorites';
+import {uiString} from './src/services/uiStrings';
+import {WebPageScreen} from './src/screens/WebPageScreen';
 import {useDailyStory} from './src/services/stories';
 import {prefetchImages} from './src/components/RemoteImage';
 
@@ -36,10 +50,12 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <PlayerProvider>
-        <AppContent />
-        <PlayerScreen />
-      </PlayerProvider>
+      <AuthProvider>
+        <PlayerProvider>
+          <AppContent />
+          <PlayerScreen />
+        </PlayerProvider>
+      </AuthProvider>
       <SplashScreen />
     </SafeAreaProvider>
   );
@@ -47,6 +63,7 @@ function App() {
 
 const VISIBLE = 1;
 const HIDDEN = 0.001;
+const WELCOME_SEEN_KEY = 'welcome_seen_v1';
 
 function AppContent() {
   const {top, bottom} = useSafeAreaInsets();
@@ -80,6 +97,51 @@ function AppContent() {
   const [showSchool, setShowSchool] = useState(false);
   const [showClubMap, setShowClubMap] = useState(false);
   const [showStories, setShowStories] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  // Quick-category jump from the search screen into a Практики sub-screen.
+  const [practicesFormat, setPracticesFormat] = useState<{
+    id: SearchCategory;
+    n: number;
+  } | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
+  // Аффирмация, открытая из «Избранного» — пейджер поверх списка.
+  const [favAffirmation, setFavAffirmation] = useState<FavoriteItem | null>(
+    null,
+  );
+  // True while Избранное is open via the player's «Сохранено» toast — its
+  // back button then returns to the player instead of just closing.
+  const favoritesFromPlayerRef = useRef(false);
+  const {reopenPlayer} = usePlayer();
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDonation, setShowDonation] = useState(false);
+  const [showCourses, setShowCourses] = useState(false);
+  // Welcome — только при первом запуске (null, пока флаг не прочитан).
+  const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(WELCOME_SEEN_KEY)
+      .then(v => setShowWelcome(v !== '1'))
+      .catch(() => setShowWelcome(false));
+  }, []);
+
+  // The «Сохранено» toasts open Избранное through this bridge (the player
+  // modal and overlay screens render outside AppContent's state). It opens as
+  // a plain overlay — no tab switch; «назад» returns to the player only when
+  // the request came from the player's toast.
+  useEffect(() => {
+    registerOpenFavoritesHandler(opts => {
+      favoritesFromPlayerRef.current = !!opts.fromPlayer;
+      setShowFavorites(true);
+    });
+    return () => registerOpenFavoritesHandler(null);
+  }, []);
+
+  function dismissWelcome(openAuth: boolean) {
+    setShowWelcome(false);
+    AsyncStorage.setItem(WELCOME_SEEN_KEY, '1').catch(() => {});
+    if (openAuth) setShowAuth(true);
+  }
 
   function handleTabPress(index: number) {
     if (index === activeTab) {
@@ -99,6 +161,7 @@ function AppContent() {
   }
 
   return (
+    <SearchContext.Provider value={{openSearch: () => setShowSearch(true)}}>
     <GradientBackground>
       <Animated.View
         style={[styles.screenSlot, {opacity: opacity0}]}
@@ -154,7 +217,10 @@ function AppContent() {
       <Animated.View
         style={[styles.screenSlot, {opacity: opacity2}]}
         pointerEvents={activeTab !== 2 ? 'none' : 'auto'}>
-        <PracticesScreen resetSignal={practicesReset} />
+        <PracticesScreen
+          resetSignal={practicesReset}
+          formatSignal={practicesFormat}
+        />
       </Animated.View>
 
       {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is
@@ -168,9 +234,30 @@ function AppContent() {
         </View>
       )}
 
+      {/* Profile tab (index 4) — guest and logged-in variants live inside.
+          Unmounted while Избранное/Настройки are open: its fixed header has
+          zIndex 10 and would float above the overlay otherwise. */}
+      {activeTab === 4 &&
+        !showFavorites &&
+        !showSettings &&
+        !showDonation &&
+        !showCourses && (
+        <View style={styles.screenSlot}>
+          <ProfileScreen
+            onOpenAuth={() => setShowAuth(true)}
+            onOpenFavorites={() => setShowFavorites(true)}
+            onOpenSettings={() => setShowSettings(true)}
+            onOpenDonation={() => setShowDonation(true)}
+            onOpenCourses={() => setShowCourses(true)}
+          />
+        </View>
+      )}
+
       {/* State detail — a top-level overlay so tapping a state card (from the
-          home picker or the Мышление tab) opens it directly, without a tab jump. */}
-      {selectedState && (
+          home picker or the Мышление tab) opens it directly, without a tab jump.
+          Unmounted while Избранное is open (тост «Сохранено» ведёт туда) — its
+          fixed header has zIndex 10 and would float above the overlay. */}
+      {selectedState && !showFavorites && (
         <View style={styles.screenSlot}>
           <StateScreen
             state={selectedState}
@@ -193,10 +280,113 @@ function AppContent() {
 
       <BottomNavBar activeIndex={activeTab} onTabPress={handleTabPress} />
 
+
       {/* Full-screen clubs map opens from the Club tab, above the nav bar. */}
       {showClubMap && (
         <View style={styles.screenSlot}>
           <ClubMapScreen onClose={() => setShowClubMap(false)} />
+        </View>
+      )}
+
+      {/* Избранное — над нав-баром, открывается из Профиля (448:10703).
+          Скрыто, пока открыта аффирмация: его FixedHeader (zIndex 10) иначе
+          всплывает поверх пейджера. */}
+      {showFavorites && !favAffirmation && (
+        <View style={styles.screenSlot}>
+          <FavoritesScreen
+            onBack={() => {
+              setShowFavorites(false);
+              if (favoritesFromPlayerRef.current) {
+                favoritesFromPlayerRef.current = false;
+                reopenPlayer();
+              }
+            }}
+            onGoPractices={() => {
+              favoritesFromPlayerRef.current = false;
+              setShowFavorites(false);
+              handleTabPress(2);
+            }}
+            onOpenAffirmation={setFavAffirmation}
+          />
+        </View>
+      )}
+
+      {/* Настройки — над нав-баром, открывается из Профиля (448:10501). */}
+      {showSettings && (
+        <View style={styles.screenSlot}>
+          <SettingsScreen onBack={() => setShowSettings(false)} />
+        </View>
+      )}
+
+      {/* Донейшн — страница сайта внутри приложения, открывается из Профиля. */}
+      {showDonation && (
+        <View style={styles.screenSlot}>
+          <WebPageScreen
+            url={uiString('profile_donation_url', 'https://mikhail-ageev.ru/donate')}
+            title={uiString('profile_tab_donation', 'Донейшн')}
+            onBack={() => setShowDonation(false)}
+          />
+        </View>
+      )}
+
+      {/* Курсы и события — страница сайта внутри приложения (Профиль). */}
+      {showCourses && (
+        <View style={styles.screenSlot}>
+          <WebPageScreen
+            url={uiString('profile_courses_url', 'https://mikhail-ageev.ru/treningi')}
+            title={uiString('profile_tab_events', 'Курсы и события')}
+            onBack={() => setShowCourses(false)}
+          />
+        </View>
+      )}
+
+      {/* Мини-бар «Продолжить практику» (448:11841) — под шапкой на всех
+          экранах; полноэкранные оверлеи ниже по коду перекрывают его. */}
+      <MiniPlayer />
+
+      {/* Аффирмация из «Избранного» — пейджер поверх Избранного, открытый на
+          сохранённой аффирмации; «назад» возвращает в Избранное. */}
+      {favAffirmation && (
+        <View style={styles.screenSlot}>
+          <AffirmationsScreen
+            initial={{id: favAffirmation.id, text: favAffirmation.title}}
+            onBack={() => setFavAffirmation(null)}
+          />
+        </View>
+      )}
+
+      {/* Auth sheet — above the nav bar; opens from Welcome and Profile. */}
+      {showAuth && (
+        <View style={styles.screenSlot}>
+          <AuthScreen onClose={() => setShowAuth(false)} />
+        </View>
+      )}
+
+      {/* First-launch welcome — covers the whole app until dismissed. */}
+      {showWelcome && (
+        <View style={styles.screenSlot}>
+          <WelcomeScreen
+            onStart={() => dismissWelcome(false)}
+            onSignIn={() => dismissWelcome(true)}
+          />
+        </View>
+      )}
+
+      {/* Global search — above the nav bar (design 448:11117). */}
+      {showSearch && (
+        <View style={styles.screenSlot}>
+          <SearchScreen
+            onBack={() => setShowSearch(false)}
+            onOpenCategory={id => {
+              setShowSearch(false);
+              setSelectedState(null);
+              opacities.forEach((op, i) =>
+                op.setValue(i === 2 ? VISIBLE : HIDDEN),
+              );
+              setActiveTab(2);
+              setPracticesFormat(prev => ({id, n: (prev?.n ?? 0) + 1}));
+            }}
+          />
         </View>
       )}
 
@@ -214,6 +404,7 @@ function AppContent() {
         </View>
       )}
     </GradientBackground>
+    </SearchContext.Provider>
   );
 }
 

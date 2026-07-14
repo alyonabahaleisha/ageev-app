@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -44,6 +44,7 @@ function BreakfastCard({item}: {item: Breakfast}) {
       audioUrl: item.audioUrl,
       coverUrl: item.coverUrl,
       durationSeconds: item.durationSeconds,
+      kind: 'breakfast',
     });
 
   const inner = (

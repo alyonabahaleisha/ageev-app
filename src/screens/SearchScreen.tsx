@@ -80,7 +80,13 @@ type Playable = {
   durationSeconds: number;
 };
 
-function ResultRow({item}: {item: Playable}) {
+function ResultRow({
+  item,
+  kind,
+}: {
+  item: Playable;
+  kind?: 'meditation' | 'webinar';
+}) {
   const {openPlayer} = usePlayer();
   return (
     <TouchableOpacity
@@ -94,6 +100,7 @@ function ResultRow({item}: {item: Playable}) {
           audioUrl: item.audioUrl,
           coverUrl: item.coverUrl,
           durationSeconds: item.durationSeconds,
+          kind,
         })
       }>
       {item.coverUrl ? (
@@ -211,7 +218,17 @@ export function SearchScreen({onBack, onOpenCategory}: Props) {
                   <Text style={styles.sectionTitle}>{s.title}</Text>
                   <View style={styles.sectionList}>
                     {s.items.map(item => (
-                      <ResultRow key={item.id} item={item} />
+                      <ResultRow
+                        key={item.id}
+                        item={item}
+                        kind={
+                          s.key === 'meditations'
+                            ? 'meditation'
+                            : s.key === 'webinars'
+                            ? 'webinar'
+                            : undefined
+                        }
+                      />
                     ))}
                   </View>
                 </View>

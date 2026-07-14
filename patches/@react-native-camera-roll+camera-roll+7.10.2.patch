@@ -1,0 +1,29 @@
+diff --git a/node_modules/@react-native-camera-roll/camera-roll/ios/RNCCameraRoll.mm b/node_modules/@react-native-camera-roll/camera-roll/ios/RNCCameraRoll.mm
+index d63f1a7..472bc12 100644
+--- a/node_modules/@react-native-camera-roll/camera-roll/ios/RNCCameraRoll.mm
++++ b/node_modules/@react-native-camera-roll/camera-roll/ios/RNCCameraRoll.mm
+@@ -209,6 +209,24 @@ static void requestPhotoLibraryAccess(RCTPromiseRejectBlock reject, PhotosAuthor
+       }
+     } completionHandler:^(BOOL success, NSError *error) {
+       if (success) {
++        // Add-only permission: fetching the created asset back would trigger
++        // an "additional access" prompt (or fail under add-only), even though
++        // the save itself succeeded. Resolve with the placeholder uri instead.
++        if (@available(iOS 14, *)) {
++          PHAuthorizationStatus readStatus = [PHPhotoLibrary authorizationStatusForAccessLevel:PHAccessLevelReadWrite];
++          if (readStatus != PHAuthorizationStatusAuthorized) {
++            resolve(@{
++              @"node": @{
++                @"type": @"image",
++                @"group_name": @[],
++                @"image": @{
++                  @"uri": [NSString stringWithFormat:@"ph://%@", placeholder.localIdentifier],
++                },
++              },
++            });
++            return;
++          }
++        }
+         PHFetchOptions *options = [PHFetchOptions new];
+         options.includeHiddenAssets = YES;
+         options.includeAllBurstAssets = YES;

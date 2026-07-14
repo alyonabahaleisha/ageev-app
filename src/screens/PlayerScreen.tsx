@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Animated,
   Dimensions,
@@ -22,19 +22,28 @@ import TrackPlayer, {
 } from 'react-native-track-player';
 import {
   ICON_CLOCK,
+  ICON_CLOSE,
   ICON_CLOSE_PLAYER,
   ICON_FORWARD10,
   ICON_HEART,
+  ICON_HEART_FILLED,
   ICON_PAUSE,
   ICON_PLAY_TRIANGLE,
   ICON_REPLAY10,
   ICON_SHARE,
 } from '../assets/icons';
 import {RemoteImage} from '../components/RemoteImage';
-import {usePlayer} from '../context/PlayerContext';
+import {PlayerTrack, usePlayer} from '../context/PlayerContext';
+import {requestOpenFavorites} from '../services/appNavigation';
+import {useBreakfasts} from '../services/breakfasts';
+import {itemAreas} from '../services/contentFilters';
+import {useFavorites} from '../services/favorites';
+import {formatDuration, useMeditations} from '../services/meditations';
+import {TEXT_SCALES, useAppSettings} from '../services/settings';
+import {useWebinars} from '../services/webinars';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
-import {typography} from '../theme/typography';
+import {fonts, typography} from '../theme/typography';
 
 function formatTime(seconds: number): string {
   const s = Math.floor(seconds);
@@ -43,26 +52,105 @@ function formatTime(seconds: number): string {
   return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
 }
 
+const clampRatio = (r: number) => Math.max(0, Math.min(1, r));
+
 function ProgressBar() {
   const {position, duration} = useProgress(500);
   const [barWidth, setBarWidth] = useState(0);
-  const progress = duration > 0 ? Math.min(position / duration, 1) : 0;
+  // While the user scrubs, the bar follows the finger (dragRatio) instead of
+  // the playback position; the actual seek happens once, on release.
+  const [dragRatio, setDragRatio] = useState<number | null>(null);
 
-  const handleSeek = useCallback(
-    async (e: {nativeEvent: {locationX: number}}) => {
-      if (barWidth > 0 && duration > 0) {
-        const ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / barWidth));
-        await TrackPlayer.seekTo(ratio * duration);
-      }
+  // Refs mirror the latest values for the PanResponder callbacks, which are
+  // created once and would otherwise close over stale state.
+  const trackRef = useRef<View>(null);
+  const trackXRef = useRef(0);
+  const widthRef = useRef(0);
+  const durationRef = useRef(0);
+  const dragRatioRef = useRef(0);
+  const pendingSeekRef = useRef<number | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  widthRef.current = barWidth;
+  durationRef.current = duration;
+
+  // Ratio from the touch's absolute screen X. locationX is unreliable here —
+  // it's relative to whichever child the finger lands on (e.g. the 28px
+  // handle), which made grabbing the handle jump the scrubber.
+  const ratioFromPageX = (pageX: number) =>
+    clampRatio((pageX - trackXRef.current) / Math.max(1, widthRef.current));
+
+  const pan = useRef(
+    PanResponder.create({
+      // Claim the touch immediately: a drag can start anywhere on the bar,
+      // and a tap (grant + release without movement) still seeks.
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: e => {
+        const pageX = e.nativeEvent.pageX;
+        // Re-measure at touch time in case the layout shifted.
+        trackRef.current?.measureInWindow(x => {
+          trackXRef.current = x;
+          const r = ratioFromPageX(pageX);
+          dragRatioRef.current = r;
+          setDragRatio(r);
+        });
+      },
+      onPanResponderMove: (_, g) => {
+        const r = ratioFromPageX(g.moveX);
+        dragRatioRef.current = r;
+        setDragRatio(r);
+      },
+      onPanResponderRelease: () => {
+        const d = durationRef.current;
+        if (d > 0) {
+          // Keep showing the scrubbed position until playback reports a
+          // position near the target (see the effect below) — the player
+          // returns the OLD position for a few hundred ms after seekTo, and
+          // releasing on a fixed timer made the handle snap back and forth.
+          pendingSeekRef.current = dragRatioRef.current * d;
+          TrackPlayer.seekTo(dragRatioRef.current * d).catch(() => {});
+          if (holdTimer.current) clearTimeout(holdTimer.current);
+          holdTimer.current = setTimeout(() => {
+            pendingSeekRef.current = null;
+            setDragRatio(null);
+          }, 3000); // safety valve if the seek never lands
+        } else {
+          setDragRatio(null);
+        }
+      },
+      onPanResponderTerminate: () => setDragRatio(null),
+    }),
+  ).current;
+
+  // End the post-release hold as soon as the reported position catches up
+  // with the seek target.
+  useEffect(() => {
+    if (
+      pendingSeekRef.current != null &&
+      Math.abs(position - pendingSeekRef.current) < 1.5
+    ) {
+      pendingSeekRef.current = null;
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      setDragRatio(null);
+    }
+  }, [position]);
+  useEffect(
+    () => () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
     },
-    [barWidth, duration],
+    [],
   );
+
+  const progress =
+    dragRatio ?? (duration > 0 ? Math.min(position / duration, 1) : 0);
+  const shownPosition = dragRatio != null ? dragRatio * duration : position;
 
   return (
     <View style={pb.container}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={handleSeek}
+      <View
+        ref={trackRef}
+        {...pan.panHandlers}
+        hitSlop={{top: 12, bottom: 12}}
         style={pb.track}
         onLayout={e => setBarWidth(e.nativeEvent.layout.width)}>
         {/* Track background */}
@@ -73,9 +161,9 @@ function ProgressBar() {
         <View style={[pb.handleGlow, {left: `${progress * 100}%` as any}]}>
           <View style={pb.handle} />
         </View>
-      </TouchableOpacity>
+      </View>
       <View style={pb.timeRow}>
-        <Text style={pb.timeText}>{formatTime(position)}</Text>
+        <Text style={pb.timeText}>{formatTime(shownPosition)}</Text>
         <Text style={pb.timeText}>{formatTime(duration)}</Text>
       </View>
     </View>
@@ -85,6 +173,7 @@ function ProgressBar() {
 const pb = StyleSheet.create({
   container: {gap: 6, alignSelf: 'stretch'},
   track: {height: 18, overflow: 'visible'},
+  // Per design 448:13170 the unplayed part of the track is solid white.
   trackBg: {
     position: 'absolute',
     left: 0,
@@ -92,7 +181,7 @@ const pb = StyleSheet.create({
     top: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: colors.white,
   },
   fill: {
     position: 'absolute',
@@ -117,6 +206,8 @@ const pb = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
     backgroundColor: '#7BC4F3',
     ...Platform.select({
       ios: {
@@ -317,7 +408,7 @@ const ctrl = StyleSheet.create({
 });
 
 const SHEET_BODY_H = Math.min(340, Dimensions.get('window').height * 0.42);
-const DEFAULT_HEADER_H = 108; // visible height of the collapsed sheet header
+const DEFAULT_HEADER_H = 82; // visible height of the collapsed sheet header
 
 
 // translateY snap points: 0 = fully expanded, SHEET_BODY_H = collapsed (the
@@ -325,9 +416,102 @@ const DEFAULT_HEADER_H = 108; // visible height of the collapsed sheet header
 const COLLAPSED_Y = SHEET_BODY_H;
 const EXPANDED_Y = 0;
 
-function DetailsSheet({description}: {description: string}) {
+// «Похожие практики» (448:10850) — медитации и вебинары той же сферы жизни,
+// что и играющий трек. Если сфера не задана (или в ней больше ничего нет) —
+// другие практики того же формата, чтобы вкладка не пустовала.
+function SimilarList({track, bottom}: {track: PlayerTrack; bottom: number}) {
+  const t = useUIStrings();
+  const {openPlayer} = usePlayer();
+  const {meditations} = useMeditations();
+  const {webinars} = useWebinars();
+  const {breakfasts} = useBreakfasts();
+
+  const all = useMemo(
+    () => [
+      ...meditations.map(m => ({...m, kind: 'meditation' as const})),
+      ...webinars.map(w => ({...w, kind: 'webinar' as const})),
+      ...breakfasts.map(b => ({...b, kind: 'breakfast' as const})),
+    ],
+    [meditations, webinars, breakfasts],
+  );
+
+  const current = all.find(i => i.id === track.id);
+  const currentAreas = current ? itemAreas(current) : [];
+  let similar = currentAreas.length
+    ? all.filter(
+        i =>
+          i.id !== track.id &&
+          itemAreas(i).some(a => currentAreas.includes(a)),
+      )
+    : [];
+  if (similar.length === 0 && track.kind) {
+    similar = all.filter(i => i.id !== track.id && i.kind === track.kind);
+  }
+
+  if (similar.length === 0) {
+    return (
+      <View style={styles.placeholder}>
+        <Text style={styles.placeholderText}>
+          {t('player_similar_placeholder', 'Скоро здесь появятся похожие практики.')}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={[styles.sheetScroll, {paddingBottom: bottom + 24}]}>
+      {similar.map((item, i) => (
+        <React.Fragment key={`${item.kind}_${item.id}`}>
+          {i > 0 && <View style={styles.similarDivider} />}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.similarRow}
+            onPress={() =>
+              openPlayer({
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                audioUrl: item.audioUrl,
+                coverUrl: item.coverUrl,
+                durationSeconds: item.durationSeconds,
+                kind: item.kind,
+              })
+            }>
+            <RemoteImage
+              source={{uri: item.coverUrl}}
+              style={styles.similarImg}
+              resizeMode="cover"
+            />
+            <View style={styles.similarTxt}>
+              <Text style={styles.similarTitle} numberOfLines={2}>
+                {item.title}
+              </Text>
+              {!!item.durationSeconds && (
+                <Text style={styles.similarSub}>
+                  {formatDuration(item.durationSeconds)}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        </React.Fragment>
+      ))}
+    </ScrollView>
+  );
+}
+
+function DetailsSheet({
+  description,
+  track,
+}: {
+  description: string;
+  track: PlayerTrack;
+}) {
   const {bottom} = useSafeAreaInsets();
   const t = useUIStrings();
+  const {settings} = useAppSettings();
+  const textScale = TEXT_SCALES[settings.textSize];
   const tabs = [
     t('player_tab_description', 'Описание'),
     t('player_tab_similar', 'Похожие практики'),
@@ -431,17 +615,20 @@ function DetailsSheet({description}: {description: string}) {
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[styles.sheetScroll, {paddingBottom: bottom + 24}]}>
-            <Text style={styles.description}>
+            <Text
+              style={[
+                styles.description,
+                {
+                  fontSize: Math.round(16 * textScale),
+                  lineHeight: Math.round(22 * textScale),
+                },
+              ]}>
               {description?.trim() ||
                 t('player_no_description', 'Описание появится позже.')}
             </Text>
           </ScrollView>
         ) : (
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>
-              {t('player_similar_placeholder', 'Скоро здесь появятся похожие практики.')}
-            </Text>
-          </View>
+          <SimilarList track={track} bottom={bottom} />
         )}
       </View>
     </Animated.View>
@@ -449,10 +636,58 @@ function DetailsSheet({description}: {description: string}) {
 }
 
 export function PlayerScreen() {
-  const {isVisible, track, closePlayer} = usePlayer();
+  const {isVisible, track, closePlayer, hidePlayer} = usePlayer();
   const {top, bottom} = useSafeAreaInsets();
+  const {isFavorite, toggleFavorite} = useFavorites();
+  const t = useUIStrings();
+  const [showSavedToast, setShowSavedToast] = useState(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hide the toast whenever the player closes or the track changes.
+  useEffect(() => {
+    setShowSavedToast(false);
+  }, [isVisible, track?.id]);
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
 
   if (!isVisible || !track) return null;
+
+  const favKind = track.kind;
+  const fav = favKind ? isFavorite(favKind, track.id) : false;
+  const subtitle =
+    track.subtitle ||
+    (favKind === 'meditation'
+      ? t('player_kind_meditation', 'Медитация')
+      : favKind === 'webinar'
+      ? t('player_kind_webinar', 'Вебинар')
+      : favKind === 'breakfast'
+      ? t('player_kind_breakfast', 'Духовный завтрак')
+      : '');
+
+  const onHeartPress = () => {
+    if (!favKind) return;
+    toggleFavorite({
+      kind: favKind,
+      id: track.id,
+      title: track.title,
+      description: track.description,
+      coverUrl: track.coverUrl,
+      audioUrl: track.audioUrl,
+      durationSeconds: track.durationSeconds,
+    });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    // `fav` is the value before the toggle — show the toast only when adding.
+    if (!fav) {
+      setShowSavedToast(true);
+      toastTimer.current = setTimeout(() => setShowSavedToast(false), 4000);
+    } else {
+      setShowSavedToast(false);
+    }
+  };
 
   return (
     <Modal
@@ -466,6 +701,16 @@ export function PlayerScreen() {
         start={{x: 0.3, y: 0}}
         end={{x: 0.7, y: 1}}
         style={styles.root}>
+        {/* Design 448:13148 layers a second 214° wash over the base gradient —
+            a subtle dark tint upper-right fading to pale blue lower-left. */}
+        <LinearGradient
+          pointerEvents="none"
+          colors={['rgba(10,44,67,0.2)', 'rgba(10,44,67,0.2)', 'rgba(191,220,240,0.2)']}
+          locations={[0, 0.58, 1]}
+          start={{x: 0.78, y: 0.09}}
+          end={{x: 0.22, y: 0.91}}
+          style={styles.bgOverlay}
+        />
 
         {/* Header */}
         <View style={[styles.header, {paddingTop: top + 7}]}>
@@ -473,7 +718,7 @@ export function PlayerScreen() {
             activeOpacity={0.8}
             onPress={closePlayer}
             style={styles.headerCloseBtn}>
-            <SvgXml xml={ICON_CLOSE_PLAYER} width={16} height={16} />
+            <SvgXml xml={ICON_CLOSE_PLAYER} width={30} height={30} />
           </TouchableOpacity>
           <View style={styles.headerRight}>
             <TouchableOpacity activeOpacity={0.8} style={styles.glassmorphicBtn}>
@@ -502,10 +747,24 @@ export function PlayerScreen() {
               <Text style={styles.title} numberOfLines={2}>
                 {track.title}
               </Text>
+              {!!subtitle && (
+                <Text style={styles.subtitle} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              )}
             </View>
-            <TouchableOpacity activeOpacity={0.8} style={styles.heartBtn}>
-              <SvgXml xml={ICON_HEART} width={24} height={24} />
-            </TouchableOpacity>
+            {!!favKind && (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.heartBtn}
+                onPress={onHeartPress}>
+                <SvgXml
+                  xml={fav ? ICON_HEART_FILLED : ICON_HEART}
+                  width={24}
+                  height={24}
+                />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Progress bar */}
@@ -516,7 +775,42 @@ export function PlayerScreen() {
         </View>
 
         {/* Bottom sheet */}
-        <DetailsSheet description={track.description} />
+        <DetailsSheet description={track.description} track={track} />
+
+        {/* «Сохранено» banner (design 448:13206) — overlays the header row
+            after the track is added to favorites. */}
+        {showSavedToast && (
+          <View style={[styles.savedToast, {top: top + 7}]}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.savedToastCol}
+              onPress={() => {
+                setShowSavedToast(false);
+                // Hide (don't close) so playback continues and «назад» in
+                // Избранное can bring the player right back.
+                hidePlayer();
+                requestOpenFavorites({fromPlayer: true});
+              }}>
+              <Text style={styles.savedToastTitle}>
+                {t('player_saved_title', 'Сохранено')}
+              </Text>
+              <View style={styles.savedToastRow}>
+                <Text style={styles.savedToastSub}>
+                  {t('player_saved_sub', 'Смотреть в разделе')}
+                </Text>
+                <Text style={styles.savedToastLink}>
+                  {t('player_saved_favorites', 'Избранное')}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setShowSavedToast(false)}
+              style={styles.savedToastClose}>
+              <SvgXml xml={ICON_CLOSE} width={24} height={24} />
+            </TouchableOpacity>
+          </View>
+        )}
       </LinearGradient>
     </Modal>
   );
@@ -525,6 +819,13 @@ export function PlayerScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  bgOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
   },
   header: {
     flexDirection: 'row',
@@ -596,6 +897,11 @@ const styles = StyleSheet.create({
     ...typography.h2,
     color: colors.white,
   },
+  subtitle: {
+    ...typography.body,
+    color: colors.white,
+    opacity: 0.65,
+  },
   heartBtn: {
     width: 47,
     height: 47,
@@ -629,14 +935,15 @@ const styles = StyleSheet.create({
   },
   grabber: {
     // Generous full-width drag strip so the handle is easy to catch.
+    // Design 448:13149: handle at y=16, tabs at y=43.
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 14,
-    paddingBottom: 18,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   sheetHandle: {
-    width: 64,
-    height: 5,
+    width: 53,
+    height: 3,
     borderRadius: 10,
     backgroundColor: colors.white,
   },
@@ -644,7 +951,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 24,
     gap: 24,
-    marginTop: 24,
   },
   tab: {
     paddingBottom: 12,
@@ -671,6 +977,93 @@ const styles = StyleSheet.create({
     color: colors.white,
     opacity: 0.85,
     lineHeight: 22,
+  },
+  savedToast: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingLeft: 16,
+    paddingRight: 12,
+    backgroundColor: '#22618D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 8},
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  savedToastCol: {
+    flex: 1,
+    gap: 3,
+  },
+  savedToastTitle: {
+    fontFamily: fonts.manrope.medium,
+    fontSize: 14,
+    lineHeight: 18.2,
+    fontWeight: '500',
+    color: colors.white,
+  },
+  savedToastRow: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  savedToastSub: {
+    ...typography.small,
+    color: colors.white,
+    opacity: 0.65,
+  },
+  savedToastLink: {
+    ...typography.small,
+    color: '#7BC4F3',
+  },
+  savedToastClose: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // ── Похожие практики (448:10850) ─────────────────────────────────────────
+  similarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  similarImg: {
+    width: 65,
+    height: 65,
+    borderRadius: 15,
+  },
+  similarTxt: {
+    flex: 1,
+    gap: 6,
+  },
+  similarTitle: {
+    ...typography.body,
+    color: colors.white,
+  },
+  similarSub: {
+    ...typography.small,
+    color: colors.white,
+    opacity: 0.65,
+  },
+  similarDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   placeholder: {
     flex: 1,
