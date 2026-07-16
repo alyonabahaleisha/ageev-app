@@ -47,6 +47,23 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
   // fill the screen (all cities when the query is empty).
   const [searchActive, setSearchActive] = useState(false);
 
+  // Клуб с двумя ссылками (Telegram и ВК) раскрывается по тапу — под строкой
+  // появляются две крупные кнопки; с одной ссылкой — открывается сразу.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  function handleClubPress(club: {
+    id: string;
+    telegramUrl?: string;
+    vkUrl?: string;
+  }) {
+    if (club.telegramUrl && club.vkUrl) {
+      setExpandedId(prev => (prev === club.id ? null : club.id));
+      return;
+    }
+    const url = club.telegramUrl || club.vkUrl;
+    if (url) Linking.openURL(url).catch(() => {});
+  }
+
   const trimmed = query.trim().toLowerCase();
   const results = trimmed
     ? clubs.filter(c => c.city.toLowerCase().includes(trimmed))
@@ -183,10 +200,7 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
                   <TouchableOpacity
                     activeOpacity={0.8}
                     style={styles.resultRow}
-                    onPress={() =>
-                      club.telegramUrl &&
-                      Linking.openURL(club.telegramUrl).catch(() => {})
-                    }>
+                    onPress={() => handleClubPress(club)}>
                     <View style={styles.resultText}>
                       <Text style={styles.resultCity}>{club.city}</Text>
                       <Text style={styles.resultInfo} numberOfLines={1}>
@@ -199,6 +213,32 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
                       </View>
                     </View>
                   </TouchableOpacity>
+                  {expandedId === club.id &&
+                    !!club.telegramUrl &&
+                    !!club.vkUrl && (
+                      <View style={styles.linkButtons}>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          style={styles.linkBtn}
+                          onPress={() =>
+                            Linking.openURL(club.telegramUrl).catch(() => {})
+                          }>
+                          <Text style={styles.linkBtnText}>
+                            {t('clubs_link_telegram', 'Telegram')}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          style={styles.linkBtn}
+                          onPress={() =>
+                            Linking.openURL(club.vkUrl!).catch(() => {})
+                          }>
+                          <Text style={styles.linkBtnText}>
+                            {t('clubs_link_vk', 'ВКонтакте')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                 </React.Fragment>
               ))}
               {results.length === 0 && (
@@ -402,6 +442,33 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.white,
     opacity: 0.65,
+  },
+  // Раскрытый клуб: две крупные кнопки-ссылки (Telegram / ВКонтакте) —
+  // белые пилюли с тёмным текстом, как у основной кнопки приложения.
+  linkButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 2,
+    paddingBottom: 16,
+  },
+  linkBtn: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // shadow/primary button: мягкое голубое свечение
+    shadowColor: colors.brand.lighter,
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  linkBtnText: {
+    ...typography.button,
+    fontSize: 15,
+    color: colors.dark,
   },
   resultBtn: {
     width: BTN_SIZE,
