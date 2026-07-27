@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["T38J3889P8.com.mikhail.manifestation"],
+        "components": [
+          {
+            "/": "/l/*",
+            "comment": "Deep links to app content: /l/<type>/<id>"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import {SvgXml} from 'react-native-svg';
 import {ICON_USER, ICON_SEARCH} from '../assets/icons';
+import {RemoteImage} from './RemoteImage';
 import {useSearch} from '../context/SearchContext';
 import {useAuth, userDisplayName} from '../context/AuthContext';
 import {useUIStrings} from '../services/uiStrings';
@@ -34,11 +35,20 @@ export function HomeHeader({name}: Props) {
     <View style={styles.container}>
       {/* Left: avatar + greeting */}
       <View style={styles.greeting}>
-        {/* White glow layer → dark shadow layer → solid avatar */}
+        {/* White glow layer → dark shadow layer → solid avatar.
+            Фото приходит из Google/Apple-аккаунта (photoURL). */}
         <View style={styles.cardGlow}>
           <View style={styles.cardShadow}>
             <View style={styles.avatar}>
-              <SvgXml xml={ICON_USER} width={ICON_SIZE} height={ICON_SIZE} />
+              {user?.photoURL ? (
+                <RemoteImage
+                  source={{uri: user.photoURL}}
+                  style={styles.avatarPhoto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <SvgXml xml={ICON_USER} width={ICON_SIZE} height={ICON_SIZE} />
+              )}
             </View>
           </View>
         </View>
@@ -112,6 +122,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarPhoto: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: BUTTON_SIZE,
+    height: BUTTON_SIZE,
+    borderRadius: BUTTON_RADIUS,
   },
   textBlock: {
     width: 148,

@@ -1,7 +1,6 @@
 import React, {useRef, useState} from 'react';
 import {
   Image,
-  Linking,
   Modal,
   StyleSheet,
   Text,
@@ -11,176 +10,71 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
-import Share, {Social} from 'react-native-share';
+import Share from 'react-native-share';
 import Clipboard from '@react-native-clipboard/clipboard';
-import {CameraRoll} from '@react-native-camera-roll/camera-roll';
 import {ICON_CLOSE_PLAYER} from '../assets/icons';
-import {
-  SHARE_ICON_COPY,
-  SHARE_ICON_INSTAGRAM,
-  SHARE_ICON_MORE,
-  SHARE_ICON_SAVE,
-  SHARE_ICON_TELEGRAM,
-  SHARE_ICON_VK,
-  SHARE_ICON_WHATSAPP,
-} from '../assets/icons/share';
 import LinearGradient from './LinearGradient';
 import {RemoteImage} from './RemoteImage';
+import {PlayerTrack} from '../context/PlayerContext';
+import {buildShareLink} from '../services/deepLinks';
+import {formatDuration} from '../services/meditations';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {fonts, typography} from '../theme/typography';
 
-// Экран «Поделиться» для аффирмаций (Figma 448:10293): сторис-карточка
-// 210×450 с текстом и логотипом (вариант 448:10359), соцсети и действия.
-// Карточка снимается через ViewShot и уходит в шаринг картинкой.
+// Экраны «Поделиться»: сторис-карточка 210×450 (Figma 448:10359) снимается
+// через ViewShot, единственная кнопка открывает системный лист шаринга —
+// сохранение, копирование, мессенджеры и Instagram там уже есть.
+// ShareAffirmationModal — текстовая карточка аффирмации;
+// ShareTrackModal — карточка медитации/вебинара/завтрака с обложкой.
 
 export type ShareAffirmationItem = {
   text: string;
+  /** Id аффирмации из общего списка — для диплинка в сообщении. */
+  id?: string;
   /** Фон карточки; без него — стандартный фон аффирмаций. */
   backgroundUrl?: string;
-};
-
-type Props = {
-  item: ShareAffirmationItem | null;
-  onClose: () => void;
 };
 
 const CARD_W = 210;
 const CARD_H = 450;
 
-export function ShareAffirmationModal({item, onClose}: Props) {
+// Общий каркас: шапка с крестиком, превью-карточка (она же снимается в
+// картинку) и кнопка системного листа. Ссылка на приложение уходит текстом
+// там, где лист это поддерживает; Instagram текст игнорирует — поэтому
+// ссылка продублирована на самой картинке.
+function ShareModalShell({
+  onClose,
+  message,
+  link,
+  children,
+}: {
+  onClose: () => void;
+  message: string;
+  /** Диплинк — копируется в буфер при шаринге (для стикера «Ссылка» в
+   *  Instagram: прикладывать ссылки к картинкам Instagram не даёт). */
+  link: string;
+  children: React.ReactNode;
+}) {
   const {top, bottom} = useSafeAreaInsets();
   const t = useUIStrings();
   const shotRef = useRef<React.ElementRef<typeof ViewShot>>(null);
-  // Короткая подпись-обратная связь («Сохранено» / «Скопировано»).
-  const [feedback, setFeedback] = useState('');
-  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
-  if (!item) return null;
-
-  const showFeedback = (msg: string) => {
-    setFeedback(msg);
-    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
-    feedbackTimer.current = setTimeout(() => setFeedback(''), 2500);
-  };
-
-  const capture = async (): Promise<string | null> => {
+  const openShareSheet = async () => {
+    let url: string | null = null;
     try {
-      const uri = await shotRef.current?.capture?.();
-      return uri ?? null;
+      url = (await shotRef.current?.capture?.()) ?? null;
     } catch {
-      return null;
+      url = null;
     }
-  };
-
-  // Конкретная соцсеть; если её нет на устройстве или шаринг в неё падает —
-  // открываем системный лист, там пользователь выберет её сам. Ссылка на
-  // приложение уходит текстом там, где это поддерживается (Telegram,
-  // WhatsApp, системный лист); Instagram игнорирует текст — там ссылка
-  // отрисована на самой картинке.
-  const shareTo = async (social?: (typeof Social)[keyof typeof Social]) => {
-    const url = await capture();
     if (!url) return;
-    const message = t('share_app_url', 'https://mikhail-ageev.ru');
-    try {
-      if (social) {
-        await Share.shareSingle({
-          social,
-          url,
-          message,
-          type: 'image/png',
-        } as any);
-      } else {
-        await Share.open({url, message, type: 'image/png', failOnCancel: false});
-      }
-    } catch {
-      Share.open({url, message, type: 'image/png', failOnCancel: false}).catch(
-        () => {},
-      );
-    }
+    Clipboard.setString(link);
+    setLinkCopied(true);
+    Share.open({url, message, type: 'image/png', failOnCancel: false}).catch(
+      () => {},
+    );
   };
-
-  // Instagram убрал выбор ассета через instagram://library (открывает Reels
-  // на последнем видео). Единственный поддерживаемый путь — «Поделиться в
-  // сторис» через пастборд: композер сторис открывается сразу с нашей
-  // карточкой как фоном.
-  const shareToInstagram = async () => {
-    const url = await capture();
-    if (!url) return;
-    try {
-      if (!(await Linking.canOpenURL('instagram-stories://share'))) {
-        throw new Error('instagram unavailable');
-      }
-      await Share.shareSingle({
-        social: Social.InstagramStories,
-        appId: t('share_instagram_app_id', '0'),
-        backgroundImage: url,
-      } as any);
-    } catch {
-      // Instagram не установлен или отказал — системный лист.
-      shareTo();
-    }
-  };
-
-  const saveImage = async () => {
-    const url = await capture();
-    if (!url) return;
-    try {
-      await CameraRoll.saveAsset(url, {type: 'photo'});
-      showFeedback(t('share_saved', 'Сохранено в галерею'));
-    } catch {
-      showFeedback(t('share_save_error', 'Не удалось сохранить'));
-    }
-  };
-
-  const copyText = () => {
-    Clipboard.setString(item.text);
-    showFeedback(t('share_copied', 'Текст скопирован'));
-  };
-
-  const socials = [
-    {
-      key: 'instagram',
-      label: 'Instagram',
-      icon: SHARE_ICON_INSTAGRAM,
-      onPress: shareToInstagram,
-    },
-    {
-      key: 'telegram',
-      label: 'Telegram',
-      icon: SHARE_ICON_TELEGRAM,
-      onPress: () => shareTo(Social.Telegram),
-    },
-    // У VK нет прямого канала в react-native-share — системный лист.
-    {key: 'vk', label: 'VK', icon: SHARE_ICON_VK, onPress: () => shareTo()},
-    {
-      key: 'whatsapp',
-      label: 'Whatsapp',
-      icon: SHARE_ICON_WHATSAPP,
-      onPress: () => shareTo(Social.Whatsapp),
-    },
-  ];
-
-  const actions = [
-    {
-      key: 'save',
-      label: t('share_action_save', 'Сохранить изображение'),
-      icon: SHARE_ICON_SAVE,
-      onPress: saveImage,
-    },
-    {
-      key: 'copy',
-      label: t('share_action_copy', 'Скопировать текст'),
-      icon: SHARE_ICON_COPY,
-      onPress: copyText,
-    },
-    {
-      key: 'more',
-      label: t('share_action_more', 'Ещё'),
-      icon: SHARE_ICON_MORE,
-      onPress: () => shareTo(),
-    },
-  ];
 
   return (
     <Modal
@@ -206,80 +100,165 @@ export function ShareAffirmationModal({item, onClose}: Props) {
           <View style={styles.closeBtn} />
         </View>
 
-        {/* Предпросмотр — он же снимается в картинку (вариант с лого). */}
+        {/* Предпросмотр — он же снимается в картинку. */}
         <View style={styles.previewWrap}>
           <ViewShot
             ref={shotRef}
             options={{format: 'png', quality: 1}}
             style={styles.card}>
-            {item.backgroundUrl ? (
-              <RemoteImage
-                source={{uri: item.backgroundUrl}}
-                style={styles.cardBg}
-                resizeMode="cover"
-              />
-            ) : (
-              <Image
-                source={require('../assets/images/affirmation-bg.png')}
-                style={styles.cardBg}
-                resizeMode="cover"
-              />
-            )}
-            <LinearGradient
-              colors={['rgba(0,0,0,0.25)', 'rgba(102,102,102,0.25)']}
-              start={{x: 0, y: 0}}
-              end={{x: 1, y: 1}}
-              style={styles.cardBg}
-              pointerEvents="none"
-            />
-            <View style={styles.cardTextBox}>
-              <Text style={styles.cardText}>{item.text}</Text>
-            </View>
-            <View style={styles.cardFooter}>
-              <Image
-                source={require('../assets/images/share-logo.png')}
-                style={styles.cardLogo}
-                resizeMode="contain"
-              />
-              {/* Ссылка на приложение — «вшита» в картинку: Instagram не
-                  позволяет прикладывать ссылки к шарингу изображений. */}
-              <Text style={styles.cardLink}>
-                {t('share_app_link', 'mikhail-ageev.ru')}
-              </Text>
-            </View>
+            {children}
           </ViewShot>
         </View>
 
-        {/* Нижний лист с целями шаринга */}
+        {/* Нижний лист: единственная кнопка — системный лист шаринга */}
         <View style={[styles.sheet, {paddingBottom: bottom + 16}]}>
-          {!!feedback && <Text style={styles.feedback}>{feedback}</Text>}
-          <View style={styles.socialRow}>
-            {socials.map(s => (
-              <TouchableOpacity
-                key={s.key}
-                activeOpacity={0.8}
-                onPress={s.onPress}
-                style={styles.socialItem}>
-                <SvgXml xml={s.icon} width={48} height={48} />
-                <Text style={styles.socialLabel}>{s.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.actionsRow}>
-            {actions.map(a => (
-              <TouchableOpacity
-                key={a.key}
-                activeOpacity={0.8}
-                onPress={a.onPress}
-                style={styles.actionItem}>
-                <SvgXml xml={a.icon} width={48} height={48} />
-                <Text style={styles.socialLabel}>{a.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={openShareSheet}
+            style={styles.shareBtn}>
+            <Text style={styles.shareBtnText}>
+              {t('share_title', 'Поделиться')}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.sheetHint}>
+            {linkCopied
+              ? t(
+                  'share_link_copied',
+                  'Ссылка скопирована — в сторис Instagram добавьте её через стикер «Ссылка»',
+                )
+              : t(
+                  'share_instagram_hint',
+                  'Ссылка скопируется автоматически — для сторис Instagram вставьте её через стикер «Ссылка»',
+                )}
+          </Text>
         </View>
       </LinearGradient>
     </Modal>
+  );
+}
+
+function CardFooter({link}: {link: string}) {
+  return (
+    <View style={styles.cardFooter}>
+      <Image
+        source={require('../assets/images/share-logo.png')}
+        style={styles.cardLogo}
+        resizeMode="contain"
+      />
+      {/* Ссылка «вшита» в картинку: Instagram не позволяет прикладывать
+          ссылки к шарингу изображений. */}
+      <Text style={styles.cardLink}>{link}</Text>
+    </View>
+  );
+}
+
+export function ShareAffirmationModal({
+  item,
+  onClose,
+}: {
+  item: ShareAffirmationItem | null;
+  onClose: () => void;
+}) {
+  const t = useUIStrings();
+  if (!item) return null;
+
+  const link = item.id
+    ? buildShareLink('affirmation', item.id)
+    : t('share_app_url', 'https://mikhail-ageev.ru');
+
+  return (
+    <ShareModalShell onClose={onClose} message={link} link={link}>
+      {item.backgroundUrl ? (
+        <RemoteImage
+          source={{uri: item.backgroundUrl}}
+          style={styles.cardBg}
+          resizeMode="cover"
+        />
+      ) : (
+        <Image
+          source={require('../assets/images/affirmation-bg.png')}
+          style={styles.cardBg}
+          resizeMode="cover"
+        />
+      )}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.25)', 'rgba(102,102,102,0.25)']}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
+        style={styles.cardBg}
+        pointerEvents="none"
+      />
+      <View style={styles.cardTextBox}>
+        <Text style={styles.cardText}>{item.text}</Text>
+      </View>
+      <CardFooter link={t('share_app_link', 'mikhail-ageev.ru')} />
+    </ShareModalShell>
+  );
+}
+
+export function ShareTrackModal({
+  track,
+  onClose,
+}: {
+  track: PlayerTrack | null;
+  onClose: () => void;
+}) {
+  const t = useUIStrings();
+  if (!track) return null;
+
+  const kindLabel =
+    track.kind === 'meditation'
+      ? t('player_kind_meditation', 'Медитация')
+      : track.kind === 'webinar'
+      ? t('player_kind_webinar', 'Вебинар')
+      : track.kind === 'breakfast'
+      ? t('player_kind_breakfast', 'Духовный завтрак')
+      : '';
+  // «Медитация „Название“»; у завтраков тип уже в названии — не дублируем.
+  const messageTitle =
+    kindLabel &&
+    !track.title.toLowerCase().startsWith(kindLabel.toLowerCase())
+      ? `${kindLabel} «${track.title}»`
+      : track.title;
+  const link = track.kind
+    ? buildShareLink(track.kind, track.id)
+    : t('share_app_url', 'https://mikhail-ageev.ru');
+  const chip = [
+    kindLabel,
+    track.durationSeconds ? formatDuration(track.durationSeconds) : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <ShareModalShell
+      onClose={onClose}
+      message={`${messageTitle}\n${link}`}
+      link={link}>
+      {!!track.coverUrl && (
+        <RemoteImage
+          source={{uri: track.coverUrl}}
+          style={styles.cardBg}
+          resizeMode="cover"
+        />
+      )}
+      {/* Равномерное затемнение, чтобы текст в центре читался на любой
+          обложке. */}
+      <LinearGradient
+        colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0.55)']}
+        start={{x: 0.5, y: 0}}
+        end={{x: 0.5, y: 1}}
+        style={styles.cardBg}
+        pointerEvents="none"
+      />
+      <View style={styles.trackInfo}>
+        {!!chip && <Text style={styles.trackKind}>{chip}</Text>}
+        <Text style={styles.trackTitle} numberOfLines={4}>
+          {track.title}
+        </Text>
+      </View>
+      <CardFooter link={t('share_app_link', 'mikhail-ageev.ru')} />
+    </ShareModalShell>
   );
 }
 
@@ -336,6 +315,31 @@ const styles = StyleSheet.create({
     color: colors.white,
     textAlign: 'center',
   },
+  trackInfo: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+  trackKind: {
+    fontFamily: fonts.manrope.medium,
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: '500',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.white,
+    opacity: 0.8,
+    marginBottom: 6,
+  },
+  trackTitle: {
+    fontFamily: fonts.manrope.semiBold,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '600',
+    color: colors.white,
+    textAlign: 'center',
+  },
   cardFooter: {
     position: 'absolute',
     bottom: 14,
@@ -367,35 +371,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 35,
     gap: 24,
   },
-  feedback: {
+  shareBtn: {
+    backgroundColor: colors.white,
+    borderRadius: 30,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  shareBtnText: {
+    ...typography.h2,
+    color: '#165079',
+  },
+  sheetHint: {
     ...typography.small,
     color: colors.white,
-    opacity: 0.85,
+    opacity: 0.7,
     textAlign: 'center',
-    marginBottom: -12,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  socialItem: {
-    width: 62,
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  actionItem: {
-    width: 84,
-    alignItems: 'center',
-    gap: 8,
-  },
-  socialLabel: {
-    ...typography.small,
-    color: colors.white,
-    textAlign: 'center',
+    marginTop: -8,
   },
 });

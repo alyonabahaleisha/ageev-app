@@ -212,7 +212,7 @@ export function FavoritesScreen({onBack, onGoPractices, onOpenAffirmation}: Prop
     null,
   );
   const shareAffirmation = (i: FavoriteItem) =>
-    setShareItem({text: i.title, backgroundUrl: i.coverUrl});
+    setShareItem({text: i.title, id: i.id, backgroundUrl: i.coverUrl});
 
   const sections: {kind: FavoriteKind; title: string; items: FavoriteItem[]}[] =
     [

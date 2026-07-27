@@ -13,10 +13,13 @@
   "dependencies": {
     "@d11/react-native-fast-image": "^8.13.0",
     "@dr.pogodin/react-native-fs": "^2.39.2",
+    "@invertase/react-native-apple-authentication": "^2.5.1",
+    "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native-camera-roll/camera-roll": "^7.10.2",
     "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-native-community/blur": "^4.4.1",
+    "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-native/new-app-screen": "0.85.3",
     "firebase": "^12.13.0",
     "react": "19.2.3",

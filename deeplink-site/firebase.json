@@ -1,0 +1,28 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": ["firebase.json", "**/.*"],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://mikhail-ageev.ru",
+        "type": 302
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/l/**",
+        "destination": "/link.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Cache-Control", "value": "max-age=3600"}
+        ]
+      }
+    ]
+  }
+}

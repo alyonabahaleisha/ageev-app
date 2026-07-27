@@ -20,6 +20,11 @@ import {
 } from '../assets/icons';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {authErrorMessage, resetPassword, signIn, signUp} from '../context/AuthContext';
+import {
+  appleSignInSupported,
+  signInWithApple,
+  signInWithGoogle,
+} from '../services/socialAuth';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -40,6 +45,8 @@ export function AuthScreen({onClose}: Props) {
   const t = useUIStrings();
 
   const [view, setView] = useState<View_>('signin');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -57,6 +64,10 @@ export function AuthScreen({onClose}: Props) {
   async function handleContinue() {
     if (loading) return;
     Keyboard.dismiss();
+    if (view === 'signup' && !firstName.trim()) {
+      setError(t('auth_error_no_name', 'Введите имя'));
+      return;
+    }
     if (!email.trim()) {
       setError(t('auth_error_no_email', 'Введите email'));
       return;
@@ -72,7 +83,7 @@ export function AuthScreen({onClose}: Props) {
         await signIn(email, password);
         onClose();
       } else if (view === 'signup') {
-        await signUp(email, password);
+        await signUp(email, password, `${firstName.trim()} ${lastName.trim()}`);
         onClose();
       } else {
         await resetPassword(email);
@@ -85,11 +96,32 @@ export function AuthScreen({onClose}: Props) {
     }
   }
 
-  function handleSocial(name: string) {
-    Alert.alert(
-      t('auth_social_soon_title', 'Скоро'),
-      t('auth_social_soon_text', `Вход через ${name} появится в ближайшем обновлении`),
-    );
+  // Google и Apple работают через Firebase; VK появится, когда будет
+  // приложение в VK ID (нужен аккаунт VK-разработчика).
+  async function handleSocial(name: 'Apple' | 'Google' | 'VK') {
+    if (loading) return;
+    if (name === 'VK') {
+      Alert.alert(
+        t('auth_social_soon_title', 'Скоро'),
+        t('auth_social_soon_text', `Вход через ${name} появится в ближайшем обновлении`),
+      );
+      return;
+    }
+    if (name === 'Apple' && !appleSignInSupported) {
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      const cred =
+        name === 'Google' ? await signInWithGoogle() : await signInWithApple();
+      if (cred) onClose(); // null = пользователь передумал
+    } catch (e) {
+      console.warn('[SocialAuth]', name, e);
+      setError(authErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
   }
 
   function openLink(url: string) {
@@ -205,6 +237,28 @@ export function AuthScreen({onClose}: Props) {
             {/* Поля */}
             <View style={styles.inputBlock}>
               <View style={styles.inputs}>
+                {isSignup && (
+                  <>
+                    <TextInput
+                      value={firstName}
+                      onChangeText={setFirstName}
+                      placeholder={t('auth_first_name_placeholder', 'Имя')}
+                      placeholderTextColor="rgba(255,255,255,0.65)"
+                      style={styles.input}
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                    />
+                    <TextInput
+                      value={lastName}
+                      onChangeText={setLastName}
+                      placeholder={t('auth_last_name_placeholder', 'Фамилия')}
+                      placeholderTextColor="rgba(255,255,255,0.65)"
+                      style={styles.input}
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                    />
+                  </>
+                )}
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
@@ -254,12 +308,14 @@ export function AuthScreen({onClose}: Props) {
             <View style={styles.social}>
               <Text style={styles.socialLabel}>{t('auth_or', 'Или')}</Text>
               <View style={styles.socialRow}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleSocial('Apple')}
-                  style={styles.socialBtn}>
-                  <SvgXml xml={ICON_AUTH_APPLE} width={52} height={52} />
-                </TouchableOpacity>
+                {appleSignInSupported && (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => handleSocial('Apple')}
+                    style={styles.socialBtn}>
+                    <SvgXml xml={ICON_AUTH_APPLE} width={52} height={52} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={() => handleSocial('Google')}

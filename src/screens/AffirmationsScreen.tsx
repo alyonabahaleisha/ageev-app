@@ -111,12 +111,15 @@ export function AffirmationsScreen({onBack, initial}: Props) {
   // fallback for items saved from state screens.
   const dailyIdx =
     activeFilter === 0 ? dailyAffirmationIndex(affirmations.length) : 0;
-  const didInitScroll = useRef(false);
+  // Re-snap on every data update until the user touches the pager: the list
+  // re-sorts itself when the CMS lifeAreas snapshot lands a moment after the
+  // affirmations one, and a one-shot scroll would then point at the wrong card
+  // (deep links / «Избранное» opened the wrong affirmation).
+  const userTouchedPager = useRef(false);
   useEffect(() => {
-    if (didInitScroll.current || affirmations.length === 0) {
+    if (userTouchedPager.current || affirmations.length === 0) {
       return;
     }
-    didInitScroll.current = true;
     let idx = -1;
     if (initial) {
       idx = affirmations.findIndex(a => a.id === initial.id);
@@ -138,6 +141,7 @@ export function AffirmationsScreen({onBack, initial}: Props) {
   const textBoxBottom = SCREEN_H * HINT_BOTTOM_RATIO + bottom + 88;
 
   function handleFilterPress(i: number) {
+    userTouchedPager.current = true;
     setActiveFilter(i);
     listRef.current?.scrollToOffset({offset: 0, animated: false});
   }
@@ -174,6 +178,9 @@ export function AffirmationsScreen({onBack, initial}: Props) {
         data={filtered}
         keyExtractor={item => item.id}
         pagingEnabled
+        onScrollBeginDrag={() => {
+          userTouchedPager.current = true;
+        }}
         showsVerticalScrollIndicator={false}
         getItemLayout={(_, index) => ({
           length: SCREEN_H,
@@ -229,7 +236,7 @@ export function AffirmationsScreen({onBack, initial}: Props) {
                 <TouchableOpacity
                   activeOpacity={0.7}
                   hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-                  onPress={() => setShareItem({text: item.text})}>
+                  onPress={() => setShareItem({text: item.text, id: item.id})}>
                   <SvgXml xml={ICON_STORY_SHARE} width={24} height={24} />
                 </TouchableOpacity>
               </View>

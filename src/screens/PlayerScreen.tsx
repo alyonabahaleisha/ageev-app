@@ -33,6 +33,7 @@ import {
   ICON_SHARE,
 } from '../assets/icons';
 import {RemoteImage} from '../components/RemoteImage';
+import {ShareTrackModal} from '../components/ShareAffirmation';
 import {PlayerTrack, usePlayer} from '../context/PlayerContext';
 import {requestOpenFavorites} from '../services/appNavigation';
 import {useBreakfasts} from '../services/breakfasts';
@@ -641,6 +642,7 @@ export function PlayerScreen() {
   const {isFavorite, toggleFavorite} = useFavorites();
   const t = useUIStrings();
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Hide the toast whenever the player closes or the track changes.
@@ -658,15 +660,15 @@ export function PlayerScreen() {
 
   const favKind = track.kind;
   const fav = favKind ? isFavorite(favKind, track.id) : false;
-  const subtitle =
-    track.subtitle ||
-    (favKind === 'meditation'
+  const kindLabel =
+    favKind === 'meditation'
       ? t('player_kind_meditation', 'Медитация')
       : favKind === 'webinar'
       ? t('player_kind_webinar', 'Вебинар')
       : favKind === 'breakfast'
       ? t('player_kind_breakfast', 'Духовный завтрак')
-      : '');
+      : '';
+  const subtitle = track.subtitle || kindLabel;
 
   const onHeartPress = () => {
     if (!favKind) return;
@@ -724,7 +726,10 @@ export function PlayerScreen() {
             <TouchableOpacity activeOpacity={0.8} style={styles.glassmorphicBtn}>
               <SvgXml xml={ICON_CLOCK} width={20} height={20} />
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.8} style={styles.glassmorphicBtn}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setShareOpen(true)}
+              style={styles.glassmorphicBtn}>
               <SvgXml xml={ICON_SHARE} width={20} height={20} />
             </TouchableOpacity>
           </View>
@@ -810,6 +815,10 @@ export function PlayerScreen() {
               <SvgXml xml={ICON_CLOSE} width={24} height={24} />
             </TouchableOpacity>
           </View>
+        )}
+        {/* «Поделиться» — сторис-карточка трека поверх плеера. */}
+        {shareOpen && (
+          <ShareTrackModal track={track} onClose={() => setShareOpen(false)} />
         )}
       </LinearGradient>
     </Modal>

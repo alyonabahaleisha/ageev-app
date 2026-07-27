@@ -12,6 +12,7 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
+  updateProfile,
   User,
 } from 'firebase/auth';
 import {auth} from '../lib/firebase';
@@ -78,8 +79,22 @@ export function signIn(email: string, password: string) {
   return signInWithEmailAndPassword(auth, email.trim(), password);
 }
 
-export function signUp(email: string, password: string) {
-  return createUserWithEmailAndPassword(auth, email.trim(), password);
+export async function signUp(
+  email: string,
+  password: string,
+  displayName?: string,
+) {
+  const cred = await createUserWithEmailAndPassword(
+    auth,
+    email.trim(),
+    password,
+  );
+  // Имя из формы регистрации — в displayName (приветствие на главной и
+  // профиль читают его через userDisplayName).
+  if (displayName?.trim()) {
+    await updateProfile(cred.user, {displayName: displayName.trim()});
+  }
+  return cred;
 }
 
 export function resetPassword(email: string) {

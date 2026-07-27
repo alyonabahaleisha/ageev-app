@@ -21,6 +21,7 @@ import {
   ICON_YOUTUBE,
 } from '../assets/icons';
 import {AccountSheet, DeleteAccountModal} from '../components/AccountModals';
+import {RemoteImage} from '../components/RemoteImage';
 import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {
@@ -123,10 +124,18 @@ export function ProfileScreen({
           {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 110},
         ]}
         showsVerticalScrollIndicator={false}>
-        {/* Аватар + приветствие */}
+        {/* Аватар + приветствие; фото приходит от Google/Apple (photoURL) */}
         <View style={styles.profileRow}>
           <View style={styles.avatar}>
-            <SvgXml xml={ICON_USER_30} width={30} height={30} />
+            {user?.photoURL ? (
+              <RemoteImage
+                source={{uri: user.photoURL}}
+                style={styles.avatarPhoto}
+                resizeMode="cover"
+              />
+            ) : (
+              <SvgXml xml={ICON_USER_30} width={30} height={30} />
+            )}
           </View>
           <View style={styles.profileText}>
             {loggedIn ? (
@@ -305,6 +314,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.28,
     shadowRadius: 30,
     elevation: 10,
+  },
+  // Фото скругляем само (overflow:hidden на контейнере срезал бы тень)
+  avatarPhoto: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   profileText: {
     flex: 1,

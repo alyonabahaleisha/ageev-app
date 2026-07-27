@@ -12,6 +12,8 @@ export type AppSettings = {
   reminderTimes: ReminderTime[];
   textSize: TextSize;
   angelOnHome: boolean;
+  /** Ежедневный пуш с аффирмацией в 9:00 — включён по умолчанию. */
+  dailyAffirmationEnabled: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -19,6 +21,7 @@ const DEFAULTS: AppSettings = {
   reminderTimes: ['morning'],
   textSize: 'standard',
   angelOnHome: true,
+  dailyAffirmationEnabled: true,
 };
 
 /** Множитель для длинных читаемых текстов (аффирмации, описания). */
@@ -33,13 +36,20 @@ const KEY = 'app_settings_v1';
 let settings: AppSettings = DEFAULTS;
 const listeners = new Set<() => void>();
 
-AsyncStorage.getItem(KEY)
+const initialLoad = AsyncStorage.getItem(KEY)
   .then(raw => {
     if (!raw) return;
     settings = {...DEFAULTS, ...JSON.parse(raw)};
     listeners.forEach(l => l());
   })
   .catch(() => {});
+
+/** Настройки после загрузки из AsyncStorage — для кода вне React (например,
+ *  планировщик уведомлений на старте, когда синхронное значение ещё дефолт). */
+export async function settingsReady(): Promise<AppSettings> {
+  await initialLoad;
+  return settings;
+}
 
 export function updateSettings(patch: Partial<AppSettings>) {
   settings = {...settings, ...patch};

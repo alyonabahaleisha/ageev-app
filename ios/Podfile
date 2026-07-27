@@ -17,6 +17,11 @@ end
 target 'AgeevApp' do
   config = use_native_modules!
 
+  # GoogleSignIn (Swift-поды AppCheckCore и т.п.) требует module maps у своих
+  # Objective-C зависимостей при статической линковке.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

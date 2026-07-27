@@ -1,5 +1,12 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Animated, ScrollView, StatusBar, StyleSheet, View} from 'react-native';
+import {
+  Animated,
+  Linking,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  View,
+} from 'react-native';
 import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
 import TrackPlayer from 'react-native-track-player';
 import {PlaybackService} from './src/services/playbackService';
@@ -38,10 +45,13 @@ import {WelcomeScreen} from './src/screens/WelcomeScreen';
 import {AuthProvider} from './src/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {registerOpenFavoritesHandler} from './src/services/appNavigation';
+import {fetchTrackForLink, parseDeepLink} from './src/services/deepLinks';
+import notifee, {EventType} from '@notifee/react-native';
+import {ensureDailyAffirmationNotifications} from './src/services/dailyNotifications';
 import {FavoriteItem} from './src/services/favorites';
 import {uiString} from './src/services/uiStrings';
 import {WebPageScreen} from './src/screens/WebPageScreen';
-import {useDailyStory} from './src/services/stories';
+import {useDailyStory, useStorySeen} from './src/services/stories';
 import {prefetchImages} from './src/components/RemoteImage';
 
 TrackPlayer.registerPlaybackService(() => PlaybackService);
@@ -73,6 +83,8 @@ function AppContent() {
   // image cache, so the first reel shows its real photo/quote immediately
   // instead of the bundled defaults flashing first.
   const {content: storyContent} = useDailyStory();
+  const {seenToday: storySeenToday, markSeenToday: markStorySeen} =
+    useStorySeen();
   useEffect(() => {
     if (!storyContent) return;
     prefetchImages([
@@ -112,7 +124,9 @@ function AppContent() {
   // True while Избранное is open via the player's «Сохранено» toast — its
   // back button then returns to the player instead of just closing.
   const favoritesFromPlayerRef = useRef(false);
-  const {reopenPlayer} = usePlayer();
+  const {reopenPlayer, openPlayer} = usePlayer();
+  // Аффирмация, открытая по диплинку — пейджер поверх всего.
+  const [linkAffirmation, setLinkAffirmation] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showDonation, setShowDonation] = useState(false);
   const [showCourses, setShowCourses] = useState(false);
@@ -136,6 +150,58 @@ function AppContent() {
     });
     return () => registerOpenFavoritesHandler(null);
   }, []);
+
+  // Диплинки (ageev:// и universal links): аффирмация открывает пейджер на
+  // нужной карточке, аудио-контент подтягивается из Firestore и уходит в плеер.
+  useEffect(() => {
+    const handle = (url: string | null) => {
+      const link = url ? parseDeepLink(url) : null;
+      if (!link) return;
+      if (link.type === 'affirmation') {
+        // Диплинк ведёт на конкретный экран: закрываем открытые оверлеи —
+        // их fixed-заголовки (zIndex 10) иначе всплывают над пейджером
+        // (паттерн overlay-zindex: экран под оверлеем размонтируется).
+        setShowSettings(false);
+        setShowFavorites(false);
+        setShowDonation(false);
+        setShowCourses(false);
+        setShowSearch(false);
+        setShowStories(false);
+        setShowClubMap(false);
+        setShowSchool(false);
+        setShowAffirmations(false);
+        setShowAuth(false);
+        setSelectedState(null);
+        setFavAffirmation(null);
+        setLinkAffirmation(link.id);
+      } else {
+        fetchTrackForLink(link)
+          .then(track => {
+            if (track) openPlayer(track);
+          })
+          .catch(() => {});
+      }
+    };
+    Linking.getInitialURL().then(handle).catch(() => {});
+    const sub = Linking.addEventListener('url', e => handle(e.url));
+
+    // Ежедневный пуш с аффирмацией: перепланировать на месяц вперёд и
+    // обработать тап по уведомлению (data.url — тот же диплинк).
+    ensureDailyAffirmationNotifications();
+    notifee
+      .getInitialNotification()
+      .then(n => handle((n?.notification.data?.url as string) ?? null))
+      .catch(() => {});
+    const unsubNotifee = notifee.onForegroundEvent(({type, detail}) => {
+      if (type === EventType.PRESS) {
+        handle((detail.notification?.data?.url as string) ?? null);
+      }
+    });
+    return () => {
+      sub.remove();
+      unsubNotifee();
+    };
+  }, [openPlayer]);
 
   function dismissWelcome(openAuth: boolean) {
     setShowWelcome(false);
@@ -175,7 +241,13 @@ function AppContent() {
           ]}
           showsVerticalScrollIndicator={false}>
           <View style={styles.aboutSection}>
-            <AboutAppBlock onPressCircle={() => setShowStories(true)} />
+            <AboutAppBlock
+              ringVisible={!storySeenToday}
+              onPressCircle={() => {
+                markStorySeen();
+                setShowStories(true);
+              }}
+            />
           </View>
           <View style={styles.practiceSection}>
             <PracticeCards />
@@ -225,7 +297,7 @@ function AppContent() {
 
       {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is
           open so its header can't flash over the map during the WebView load. */}
-      {activeTab === 3 && !showClubMap && (
+      {activeTab === 3 && !showClubMap && !linkAffirmation && (
         <View style={styles.screenSlot}>
           <ClubScreen
             onOpenMap={() => setShowClubMap(true)}
@@ -235,13 +307,15 @@ function AppContent() {
       )}
 
       {/* Profile tab (index 4) — guest and logged-in variants live inside.
-          Unmounted while Избранное/Настройки are open: its fixed header has
-          zIndex 10 and would float above the overlay otherwise. */}
+          Unmounted while Избранное/Настройки/Auth are open: its fixed header
+          has zIndex 10 and would float above the overlay otherwise. */}
       {activeTab === 4 &&
         !showFavorites &&
         !showSettings &&
         !showDonation &&
-        !showCourses && (
+        !showCourses &&
+        !showAuth &&
+        !linkAffirmation && (
         <View style={styles.screenSlot}>
           <ProfileScreen
             onOpenAuth={() => setShowAuth(true)}
@@ -351,6 +425,17 @@ function AppContent() {
           <AffirmationsScreen
             initial={{id: favAffirmation.id, text: favAffirmation.title}}
             onBack={() => setFavAffirmation(null)}
+          />
+        </View>
+      )}
+
+      {/* Аффирмация по диплинку — пейджер поверх текущего экрана. */}
+      {linkAffirmation && (
+        <View style={styles.screenSlot}>
+          <AffirmationsScreen
+            key={linkAffirmation}
+            initial={{id: linkAffirmation}}
+            onBack={() => setLinkAffirmation(null)}
           />
         </View>
       )}

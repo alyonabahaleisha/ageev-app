@@ -1,5 +1,6 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {doc, getDoc} from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {db} from '../lib/firebase';
 import {PlayerTrack} from '../context/PlayerContext';
 
@@ -36,6 +37,31 @@ function todayKey(): string {
 async function getData(id: string, col: string) {
   const snap = await getDoc(doc(db, col, id));
   return snap.exists() ? (snap.data() as Record<string, unknown>) : null;
+}
+
+// «Просмотрено сегодня»: анимированный блик вокруг портрета на главной —
+// подсказка о новой сторис; после первого открытия за день он гаснет.
+const STORY_SEEN_KEY = 'story_seen_date_v1';
+
+export function useStorySeen(): {
+  seenToday: boolean;
+  markSeenToday: () => void;
+} {
+  const [seenToday, setSeenToday] = useState(false);
+  const dateKey = todayKey();
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORY_SEEN_KEY)
+      .then(v => setSeenToday(v === dateKey))
+      .catch(() => {});
+  }, [dateKey]);
+
+  const markSeenToday = useCallback(() => {
+    setSeenToday(true);
+    AsyncStorage.setItem(STORY_SEEN_KEY, dateKey).catch(() => {});
+  }, [dateKey]);
+
+  return {seenToday, markSeenToday};
 }
 
 export function useDailyStory(): {content: StoryContent | null; loading: boolean} {

@@ -18,6 +18,10 @@ import {
   TextSize,
   useAppSettings,
 } from '../services/settings';
+import {
+  cancelDailyAffirmationNotifications,
+  ensureDailyAffirmationNotifications,
+} from '../services/dailyNotifications';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -88,6 +92,24 @@ export function SettingsScreen({onBack}: Props) {
               {t('settings_notifications_title', 'Уведомления')}
             </Text>
             <View style={styles.cardBody}>
+              {/* Аффирмация дня в 9:00 — включена по умолчанию; тумблер
+                  управляет реальным расписанием локальных уведомлений. */}
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>
+                  {t('settings_daily_affirmation', 'Аффирмация дня в 9:00')}
+                </Text>
+                <ToggleSwitch
+                  value={settings.dailyAffirmationEnabled}
+                  onChange={v => {
+                    updateSettings({dailyAffirmationEnabled: v});
+                    if (v) {
+                      ensureDailyAffirmationNotifications();
+                    } else {
+                      cancelDailyAffirmationNotifications();
+                    }
+                  }}
+                />
+              </View>
               <View style={styles.row}>
                 <Text style={styles.rowLabel}>
                   {t('settings_reminders_label', 'Напоминания о практике')}

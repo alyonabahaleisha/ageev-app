@@ -98,7 +98,14 @@ function StoryRing() {
   );
 }
 
-export function AboutAppBlock({onPressCircle}: {onPressCircle?: () => void}) {
+export function AboutAppBlock({
+  onPressCircle,
+  ringVisible = true,
+}: {
+  onPressCircle?: () => void;
+  /** Блик «новая сторис»; гаснет после первого просмотра за день. */
+  ringVisible?: boolean;
+}) {
   const t = useUIStrings();
   return (
     <View style={styles.container}>
@@ -131,7 +138,7 @@ export function AboutAppBlock({onPressCircle}: {onPressCircle?: () => void}) {
           style={styles.img}
           resizeMode="contain"
         />
-        <StoryRing />
+        {ringVisible && <StoryRing />}
       </TouchableOpacity>
     </View>
   );
