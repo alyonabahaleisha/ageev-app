@@ -18,7 +18,7 @@ import {WebinarsScreen} from './WebinarsScreen';
 import {AffirmationsScreen} from './AffirmationsScreen';
 import {BreakfastsScreen} from './BreakfastsScreen';
 import {GradientBackground} from '../components/GradientBackground';
-import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {useBreakfasts} from '../services/breakfasts';
 import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
@@ -109,7 +109,8 @@ export function PracticesScreen({
   resetSignal?: number;
   formatSignal?: FormatSignal;
 }) {
-  const {top, bottom} = useSafeAreaInsets();
+  const {bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const [subScreen, setSubScreen] = useState<
     'list' | 'meditations' | 'affirmations' | 'webinars' | 'breakfasts'
   >('list');
@@ -139,7 +140,7 @@ export function PracticesScreen({
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          {paddingTop: headerScrollPadding(top)},
+          {paddingTop: scrollPad},
         ]}
         showsVerticalScrollIndicator={false}>
 

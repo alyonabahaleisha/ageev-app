@@ -26,9 +26,9 @@ export function MiniPlayer() {
   const isPlaying = playback.state === State.Playing;
 
   return (
-    // В макете бар стоит на y=117 при статус-баре 47: шапка top+7, ряд 47,
-    // отступ 16.
-    <View style={[styles.bar, {top: top + 7 + 47 + 16}]}>
+    // Правки (Figma 489:11217): бар 40px, отступ от шапки 10px — плеер
+    // перекрывал важный контент.
+    <View style={[styles.bar, {top: top + 7 + 47 + 10}]}>
       <TouchableOpacity
         activeOpacity={0.8}
         style={styles.playBtn}
@@ -37,8 +37,8 @@ export function MiniPlayer() {
         }>
         <SvgXml
           xml={isPlaying ? ICON_PAUSE : ICON_PLAY_TRIANGLE}
-          width={isPlaying ? 20 : 18}
-          height={isPlaying ? 20 : 17}
+          width={isPlaying ? 16 : 14}
+          height={isPlaying ? 16 : 13}
           opacity={0.88}
         />
       </TouchableOpacity>
@@ -72,7 +72,7 @@ export function MiniPlayer() {
           TrackPlayer.pause().catch(() => {});
           dismissMini();
         }}>
-        <SvgXml xml={ICON_CLOSE} width={24} height={24} />
+        <SvgXml xml={ICON_CLOSE} width={20} height={20} />
       </TouchableOpacity>
     </View>
   );
@@ -88,7 +88,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 8,
+    height: 40,
+    paddingVertical: 5,
     paddingLeft: 12,
     paddingRight: 12,
     // Непрозрачный, как баннер «Сохранено», — сквозь стеклянный фон
@@ -108,24 +109,23 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  // Без обводки и компактнее — по правкам иконка вписывается в бар 40px.
   playBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   textCol: {
     flex: 1,
-    gap: 3,
+    gap: 2,
   },
   title: {
     fontFamily: fonts.manrope.medium,
-    fontSize: 14,
-    lineHeight: 18.2,
+    fontSize: 12,
+    lineHeight: 15.6,
     fontWeight: '500',
     color: colors.white,
   },
@@ -137,6 +137,8 @@ const styles = StyleSheet.create({
   },
   subText: {
     ...typography.small,
+    fontSize: 10,
+    lineHeight: 13,
     color: colors.white,
     flexShrink: 1,
   },

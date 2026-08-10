@@ -174,7 +174,8 @@ function AffirmationSlide({onReady, content}: SlideProps) {
         {t('story_affirmation_title', 'Аффирмация дня')}
       </Text>
       <View style={[styles.centerBlock, {top: top + 297}]}>
-        <Text style={styles.h1}>
+        {/* Правки (Figma 489:11217): текст в карточках единый — 22px. */}
+        <Text style={styles.h1Mid}>
           {affirmation?.text ||
             t(
               'story_affirmation_fallback',

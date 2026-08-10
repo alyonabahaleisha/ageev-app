@@ -22,7 +22,7 @@ import {
 } from '../assets/icons';
 import {AccountSheet, DeleteAccountModal} from '../components/AccountModals';
 import {RemoteImage} from '../components/RemoteImage';
-import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {PrimaryButton} from '../components/PrimaryButton';
 import {
   authErrorMessage,
@@ -54,7 +54,8 @@ export function ProfileScreen({
   onOpenDonation,
   onOpenCourses,
 }: Props) {
-  const {top, bottom} = useSafeAreaInsets();
+  const {bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const {user} = useAuth();
   const t = useUIStrings();
   const [modal, setModal] = useState<'none' | 'account' | 'delete'>('none');
@@ -121,7 +122,7 @@ export function ProfileScreen({
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 110},
+          {paddingTop: scrollPad, paddingBottom: bottom + 110},
         ]}
         showsVerticalScrollIndicator={false}>
         {/* Аватар + приветствие; фото приходит от Google/Apple (photoURL) */}
@@ -192,22 +193,36 @@ export function ProfileScreen({
             <Text style={styles.socialTitle}>
               {t('profile_social_title', 'Мы на связи')}
             </Text>
+            {/* Правки (Figma 489:11217): в CMS эти URL пустые — иконки не
+                срабатывали. Дефолты — публичные страницы школы с
+                mikhail-ageev.ru; CMS-ключи social_*_url их переопределяют. */}
             <View style={styles.socialRow}>
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => openUrl(t('social_instagram_url', ''))}
+                onPress={() =>
+                  openUrl(t('social_instagram_url', 'https://mikhail-ageev.ru'))
+                }
                 style={styles.socialBtn}>
                 <SvgXml xml={ICON_INSTAGRAM} width={20} height={20} />
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => openUrl(t('social_youtube_url', ''))}
+                onPress={() =>
+                  openUrl(
+                    t(
+                      'social_youtube_url',
+                      'https://www.youtube.com/c/%D0%9C%D0%B8%D1%85%D0%B0%D0%B8%D0%BB%D0%90%D0%B3%D0%B5%D0%B5%D0%B2',
+                    ),
+                  )
+                }
                 style={styles.socialBtn}>
                 <SvgXml xml={ICON_YOUTUBE} width={25} height={16} />
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => openUrl(t('social_telegram_url', ''))}
+                onPress={() =>
+                  openUrl(t('social_telegram_url', 'https://t.me/ageevschool'))
+                }
                 style={styles.socialBtn}>
                 <SvgXml xml={ICON_TELEGRAM} width={22} height={22} />
               </TouchableOpacity>

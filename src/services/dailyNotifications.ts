@@ -12,7 +12,7 @@ import {
   buildAffirmationList,
   AreaDoc,
 } from './affirmations';
-import {settingsReady} from './settings';
+import {ReminderTime, settingsReady} from './settings';
 import {uiString} from './uiStrings';
 
 // Ежедневный пуш с аффирмацией в 9:00 локального времени. Без сервера:
@@ -172,5 +172,84 @@ export async function cancelDailyAffirmationNotifications(): Promise<void> {
         .map(id => notifee.cancelTriggerNotification(id)),
     );
   } catch {}
+}
+
+// ── Напоминания о практике (Настройки → Уведомления) ─────────────────────────
+// Правки (Figma 489:11217): тумблер и чипы «Утро/День/Вечер» раньше ничего не
+// планировали. Локальные уведомления на месяц вперёд, как у аффирмации дня.
+
+const PRACTICE_PREFIX = 'practice-rem-';
+const PRACTICE_HOURS: Record<ReminderTime, number> = {
+  morning: 8,
+  day: 14,
+  evening: 20,
+};
+
+/** Перепланировать напоминания о практике по текущим настройкам. */
+export async function ensurePracticeReminders(): Promise<void> {
+  try {
+    const appSettings = await settingsReady();
+    // Старое расписание под снос в любом случае — настройки могли измениться.
+    const pending = await notifee.getTriggerNotificationIds();
+    await Promise.all(
+      pending
+        .filter(id => id.startsWith(PRACTICE_PREFIX))
+        .map(id => notifee.cancelTriggerNotification(id)),
+    );
+    if (!appSettings.remindersEnabled || appSettings.reminderTimes.length === 0) {
+      return;
+    }
+    const perm = await notifee.requestPermission();
+    if (perm.authorizationStatus < AuthorizationStatus.AUTHORIZED) {
+      return;
+    }
+
+    const channelId =
+      Platform.OS === 'android'
+        ? await notifee.createChannel({
+            id: 'practice-reminders',
+            name: 'Напоминания о практике',
+            importance: AndroidImportance.DEFAULT,
+          })
+        : undefined;
+
+    const title = uiString('notif_practice_title', 'Время практики');
+    const body = uiString(
+      'notif_practice_body',
+      'Уделите несколько минут себе — выберите практику на сегодня',
+    );
+    const now = new Date();
+    for (let i = 0; i <= DAYS_AHEAD; i++) {
+      for (const time of appSettings.reminderTimes) {
+        const d = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() + i,
+          PRACTICE_HOURS[time],
+          0,
+          0,
+        );
+        if (d.getTime() <= Date.now()) continue;
+        const trigger: TimestampTrigger = {
+          type: TriggerType.TIMESTAMP,
+          timestamp: d.getTime(),
+        };
+        await notifee.createTriggerNotification(
+          {
+            id: `${PRACTICE_PREFIX}${dateKey(d)}-${time}`,
+            title,
+            body,
+            ios: {sound: 'default'},
+            android: channelId
+              ? {channelId, pressAction: {id: 'default'}}
+              : undefined,
+          },
+          trigger,
+        );
+      }
+    }
+  } catch (e) {
+    console.log('FETCHCHECK practice reminders ERROR', (e as Error)?.message);
+  }
 }
 

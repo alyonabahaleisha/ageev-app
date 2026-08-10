@@ -18,7 +18,7 @@ import {
   ICON_PLAY_TRIANGLE,
   ICON_SHARE,
 } from '../assets/icons';
-import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
 import LinearGradient from '../components/LinearGradient';
 import {PrimaryButton} from '../components/PrimaryButton';
@@ -203,7 +203,8 @@ function renderCard(
 
 /** Избранное (Figma 448:10703, пустое — 448:10681, списки — 448:10692). */
 export function FavoritesScreen({onBack, onGoPractices, onOpenAffirmation}: Props) {
-  const {top, bottom} = useSafeAreaInsets();
+  const {bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const {items, loaded} = useFavorites();
   const t = useUIStrings();
   // «Посмотреть все» открывает вертикальный список одного раздела.
@@ -247,7 +248,7 @@ export function FavoritesScreen({onBack, onGoPractices, onOpenAffirmation}: Prop
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 40},
+          {paddingTop: scrollPad, paddingBottom: bottom + 40},
         ]}
         showsVerticalScrollIndicator={false}>
         {empty ? (

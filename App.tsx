@@ -16,7 +16,7 @@ import {GradientBackground} from './src/components/GradientBackground';
 import {SplashScreen} from './src/components/SplashScreen';
 import {BottomNavBar} from './src/components/BottomNavBar';
 import {HomeHeader} from './src/components/HomeHeader';
-import {FixedHeader, headerScrollPadding} from './src/components/FixedHeader';
+import {FixedHeader, useHeaderScrollPadding} from './src/components/FixedHeader';
 import {MiniPlayer} from './src/components/MiniPlayer';
 import {AboutAppBlock} from './src/components/AboutAppBlock';
 import {AffirmationCard} from './src/components/AffirmationCard';
@@ -47,10 +47,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {registerOpenFavoritesHandler} from './src/services/appNavigation';
 import {fetchTrackForLink, parseDeepLink} from './src/services/deepLinks';
 import notifee, {EventType} from '@notifee/react-native';
-import {ensureDailyAffirmationNotifications} from './src/services/dailyNotifications';
+import {
+  ensureDailyAffirmationNotifications,
+  ensurePracticeReminders,
+} from './src/services/dailyNotifications';
 import {FavoriteItem} from './src/services/favorites';
 import {uiString} from './src/services/uiStrings';
 import {WebPageScreen} from './src/screens/WebPageScreen';
+import {DonationScreen} from './src/screens/DonationScreen';
 import {useDailyStory, useStorySeen} from './src/services/stories';
 import {prefetchImages} from './src/components/RemoteImage';
 
@@ -76,7 +80,8 @@ const HIDDEN = 0.001;
 const WELCOME_SEEN_KEY = 'welcome_seen_v1';
 
 function AppContent() {
-  const {top, bottom} = useSafeAreaInsets();
+  const {bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const [activeTab, setActiveTab] = useState(0);
 
   // Load today's stories at launch (not when the viewer opens) and warm the
@@ -188,6 +193,7 @@ function AppContent() {
     // Ежедневный пуш с аффирмацией: перепланировать на месяц вперёд и
     // обработать тап по уведомлению (data.url — тот же диплинк).
     ensureDailyAffirmationNotifications();
+    ensurePracticeReminders();
     notifee
       .getInitialNotification()
       .then(n => handle((n?.notification.data?.url as string) ?? null))
@@ -210,6 +216,11 @@ function AppContent() {
   }
 
   function handleTabPress(index: number) {
+    // Правки (Figma 489:11217): из «Аффирмаций» и «О школе» вкладки не
+    // срабатывали — таб переключался под оверлеем, а оверлей оставался
+    // открытым. Тап по вкладке закрывает эти оверлеи.
+    setShowAffirmations(false);
+    setShowSchool(false);
     if (index === activeTab) {
       if (index === 0) {
         homeScrollRef.current?.scrollTo({y: 0, animated: true});
@@ -237,7 +248,7 @@ function AppContent() {
           style={styles.scroll}
           contentContainerStyle={[
             styles.content,
-            {paddingTop: headerScrollPadding(top)},
+            {paddingTop: scrollPad},
           ]}
           showsVerticalScrollIndicator={false}>
           <View style={styles.aboutSection}>
@@ -392,14 +403,11 @@ function AppContent() {
         </View>
       )}
 
-      {/* Донейшн — страница сайта внутри приложения, открывается из Профиля. */}
+      {/* Донейшн (Правки, Figma 489:11217): нативная форма пожертвования и
+          экран «Спасибо» вместо простой ссылки на сайт. */}
       {showDonation && (
         <View style={styles.screenSlot}>
-          <WebPageScreen
-            url={uiString('profile_donation_url', 'https://mikhail-ageev.ru/donate')}
-            title={uiString('profile_tab_donation', 'Донейшн')}
-            onBack={() => setShowDonation(false)}
-          />
+          <DonationScreen onClose={() => setShowDonation(false)} />
         </View>
       )}
 

@@ -2,6 +2,7 @@ import React from 'react';
 import {StyleSheet, View} from 'react-native';
 import LinearGradient from './LinearGradient';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {usePlayer} from '../context/PlayerContext';
 
 // Height of the header row content (avatar / title / search button).
 export const HEADER_CONTENT_HEIGHT = 47;
@@ -9,6 +10,10 @@ export const HEADER_CONTENT_HEIGHT = 47;
 export const HEADER_TOP_GAP = 7;
 // Extra space below the header where scrolling content fades out behind it.
 const FADE_HEIGHT = 24;
+// Правки (Figma 489:11217): при видимом мини-плеере между шапкой и контентом
+// нужно 60px — отступ 10 + плеер 40 + отступ 10, чтобы он ничего не
+// перекрывал. Без плеера контент стоит вплотную к шапке, как в макетах.
+export const MINI_PLAYER_CLEARANCE = 60;
 
 /**
  * Top padding a ScrollView needs so its content starts below the fixed header
@@ -16,6 +21,17 @@ const FADE_HEIGHT = 24;
  */
 export function headerScrollPadding(topInset: number) {
   return topInset + HEADER_TOP_GAP + HEADER_CONTENT_HEIGHT;
+}
+
+/**
+ * Как headerScrollPadding, но добавляет место под мини-плеер, пока тот
+ * виден, — контент сдвигается ниже бара вместо того, чтобы прятаться под ним.
+ */
+export function useHeaderScrollPadding() {
+  const {top} = useSafeAreaInsets();
+  const {track, isVisible, miniDismissed} = usePlayer();
+  const miniVisible = !!track && !isVisible && !miniDismissed;
+  return headerScrollPadding(top) + (miniVisible ? MINI_PLAYER_CLEARANCE : 0);
 }
 
 /**

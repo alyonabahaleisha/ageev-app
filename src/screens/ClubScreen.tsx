@@ -14,7 +14,11 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK, ICON_SEARCH, ICON_EXPAND} from '../assets/icons';
-import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {
+  FixedHeader,
+  headerScrollPadding,
+  useHeaderScrollPadding,
+} from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
 import LinearGradient from '../components/LinearGradient';
 import {useClubs} from '../services/clubs';
@@ -40,6 +44,7 @@ type Props = {onOpenMap: () => void; onClose: () => void};
 
 export function ClubScreen({onOpenMap, onClose}: Props) {
   const {top, bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const {clubs} = useClubs();
   const t = useUIStrings();
   const [query, setQuery] = useState('');
@@ -98,7 +103,7 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 110},
+          {paddingTop: scrollPad, paddingBottom: bottom + 110},
         ]}
         showsVerticalScrollIndicator={false}>
         {/* Intro */}

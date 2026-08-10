@@ -32,6 +32,7 @@ import {
   ICON_REPLAY10,
   ICON_SHARE,
 } from '../assets/icons';
+import {PostPracticeOverlay} from '../components/PostPractice';
 import {RemoteImage} from '../components/RemoteImage';
 import {ShareTrackModal} from '../components/ShareAffirmation';
 import {PlayerTrack, usePlayer} from '../context/PlayerContext';
@@ -637,13 +638,69 @@ function DetailsSheet({
 }
 
 export function PlayerScreen() {
-  const {isVisible, track, closePlayer, hidePlayer} = usePlayer();
+  const {isVisible, track, closePlayer, hidePlayer, openPlayer} = usePlayer();
   const {top, bottom} = useSafeAreaInsets();
   const {isFavorite, toggleFavorite} = useFavorites();
   const t = useUIStrings();
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Таймер практики (Правки, Figma 489:11217): по клику на часы открывается
+  // лист «Таймер» — практика ставится на паузу через выбранное время.
+  const [timerOpen, setTimerOpen] = useState(false);
+  const [timerChoice, setTimerChoice] = useState<number | 'end'>('end');
+  const [timerRunning, setTimerRunning] = useState(false);
+  const sleepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelSleepTimer = useCallback(() => {
+    if (sleepTimer.current) clearTimeout(sleepTimer.current);
+    sleepTimer.current = null;
+    setTimerRunning(false);
+  }, []);
+
+  // Новый трек — прежний таймер не должен глушить его посреди практики.
+  useEffect(() => {
+    cancelSleepTimer();
+    setTimerChoice('end');
+    setTimerOpen(false);
+  }, [track?.id, cancelSleepTimer]);
+  useEffect(() => cancelSleepTimer, [cancelSleepTimer]);
+
+  const startSleepTimer = () => {
+    cancelSleepTimer();
+    if (timerChoice !== 'end') {
+      sleepTimer.current = setTimeout(() => {
+        TrackPlayer.pause().catch(() => {});
+        setTimerRunning(false);
+      }, timerChoice * 60 * 1000);
+      setTimerRunning(true);
+    }
+    setTimerOpen(false);
+  };
+
+  // Экраны после практики (Правки, Figma 489:11217): по завершении трека
+  // открывается «Как вы себя чувствуете?» → «Что поможет вам дальше».
+  const [postPractice, setPostPractice] = useState(false);
+  const playback = usePlaybackState();
+  const endedHandled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!track) return;
+    if (
+      playback.state === State.Ended &&
+      isVisible &&
+      endedHandled.current !== track.id
+    ) {
+      endedHandled.current = track.id;
+      setPostPractice(true);
+    } else if (playback.state === State.Playing) {
+      // Трек запустили заново — следующий финал снова покажет флоу.
+      endedHandled.current = null;
+    }
+  }, [playback.state, track, isVisible]);
+  useEffect(() => {
+    setPostPractice(false);
+  }, [track?.id]);
 
   // Hide the toast whenever the player closes or the track changes.
   useEffect(() => {
@@ -723,7 +780,13 @@ export function PlayerScreen() {
             <SvgXml xml={ICON_CLOSE_PLAYER} width={30} height={30} />
           </TouchableOpacity>
           <View style={styles.headerRight}>
-            <TouchableOpacity activeOpacity={0.8} style={styles.glassmorphicBtn}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setTimerOpen(true)}
+              style={[
+                styles.glassmorphicBtn,
+                timerRunning && styles.glassmorphicBtnActive,
+              ]}>
               <SvgXml xml={ICON_CLOCK} width={20} height={20} />
             </TouchableOpacity>
             <TouchableOpacity
@@ -820,6 +883,87 @@ export function PlayerScreen() {
         {shareOpen && (
           <ShareTrackModal track={track} onClose={() => setShareOpen(false)} />
         )}
+
+        {/* После завершения практики — самочувствие и рекомендации. */}
+        {postPractice && (
+          <PostPracticeOverlay
+            onClose={() => setPostPractice(false)}
+            onOpenTrack={next => {
+              setPostPractice(false);
+              openPlayer(next);
+            }}
+          />
+        )}
+
+        {/* Таймер (Правки, Figma 489:11217): «Практика завершится
+            автоматически по выбранному времени». */}
+        {timerOpen && (
+          <View style={styles.timerOverlay}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setTimerOpen(false)}
+            />
+            <View style={styles.timerCard}>
+              <View style={styles.timerHead}>
+                <View style={styles.timerHeadBtn} />
+                <Text style={styles.timerTitle}>
+                  {t('player_timer_title', 'Таймер')}
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setTimerOpen(false)}
+                  style={styles.timerHeadBtn}
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                  <SvgXml xml={ICON_CLOSE} width={24} height={24} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.timerSubtitle}>
+                {t(
+                  'player_timer_subtitle',
+                  'Практика завершится автоматически по выбранному времени.',
+                )}
+              </Text>
+              <View style={styles.timerOptions}>
+                {[5, 10, 15, 20, 30].map(m => (
+                  <TouchableOpacity
+                    key={m}
+                    activeOpacity={0.8}
+                    onPress={() => setTimerChoice(m)}
+                    style={styles.timerOption}>
+                    <Text
+                      style={[
+                        styles.timerOptionText,
+                        timerChoice === m && styles.timerOptionTextActive,
+                      ]}>
+                      {m} {t('player_timer_minutes', 'минут')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setTimerChoice('end')}
+                  style={styles.timerOption}>
+                  <Text
+                    style={[
+                      styles.timerOptionText,
+                      timerChoice === 'end' && styles.timerOptionTextActive,
+                    ]}>
+                    {t('player_timer_till_end', 'До конца практики')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={startSleepTimer}
+                style={styles.timerStartBtn}>
+                <Text style={styles.timerStartText}>
+                  {t('player_timer_start', 'Начать')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </LinearGradient>
     </Modal>
   );
@@ -862,6 +1006,95 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Часы подсвечены, пока идёт отсчёт таймера практики.
+  glassmorphicBtnActive: {
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+
+  // ── Таймер практики ───────────────────────────────────────────────────────
+  timerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 36,
+  },
+  timerCard: {
+    alignSelf: 'stretch',
+    backgroundColor: '#3A7CAD',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    gap: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 12},
+        shadowOpacity: 0.25,
+        shadowRadius: 32,
+      },
+      android: {elevation: 12},
+    }),
+  },
+  timerHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timerHeadBtn: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerTitle: {
+    ...typography.h2,
+    color: colors.white,
+    flex: 1,
+    textAlign: 'center',
+  },
+  timerSubtitle: {
+    ...typography.small,
+    color: colors.white,
+    opacity: 0.75,
+    textAlign: 'center',
+  },
+  timerOptions: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  timerOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  timerOptionText: {
+    ...typography.body,
+    color: colors.white,
+    opacity: 0.55,
+    textAlign: 'center',
+  },
+  timerOptionTextActive: {
+    ...typography.bodyMedium,
+    color: colors.white,
+    opacity: 1,
+  },
+  timerStartBtn: {
+    backgroundColor: colors.white,
+    borderRadius: 50,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerStartText: {
+    ...typography.button,
+    color: colors.dark,
   },
   content: {
     flex: 1,

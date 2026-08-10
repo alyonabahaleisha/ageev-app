@@ -12,7 +12,7 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_SEARCH} from '../assets/icons';
-import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {RemoteImage} from '../components/RemoteImage';
@@ -69,7 +69,8 @@ type Props = {
 };
 
 export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
-  const {top, bottom} = useSafeAreaInsets();
+  const {bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const scrollRef = useRef<ScrollView>(null);
   const {states, loading} = useMindsetStates();
   const visibleStates = states.filter(hasStateContent);
@@ -87,7 +88,7 @@ export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          {paddingTop: headerScrollPadding(top)},
+          {paddingTop: scrollPad},
         ]}
         showsVerticalScrollIndicator={false}>
 

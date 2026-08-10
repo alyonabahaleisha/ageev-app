@@ -11,7 +11,7 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK, ICON_CLOCK, ICON_PLAY_TRIANGLE, ICON_SEARCH} from '../assets/icons';
-import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import LinearGradient from '../components/LinearGradient';
 import {RemoteImage} from '../components/RemoteImage';
 import {usePlayer} from '../context/PlayerContext';
@@ -95,7 +95,8 @@ function MeditationCard({item}: {item: Meditation}) {
 }
 
 export function MeditationsScreen({onBack}: Props) {
-  const {top, bottom} = useSafeAreaInsets();
+  const {bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const {meditations, loading} = useMeditations();
   const t = useUIStrings();
   const {openSearch} = useSearch();
@@ -107,7 +108,7 @@ export function MeditationsScreen({onBack}: Props) {
     <>
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.content, {paddingTop: headerScrollPadding(top)}]}
+      contentContainerStyle={[styles.content, {paddingTop: scrollPad}]}
       showsVerticalScrollIndicator={false}>
 
       {/* Title */}

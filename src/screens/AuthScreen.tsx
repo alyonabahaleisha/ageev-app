@@ -78,15 +78,23 @@ export function AuthScreen({onClose}: Props) {
     }
     setError('');
     setLoading(true);
+    // Правки (Figma 489:11217): iOS-клавиатура подставляет email с пробелом —
+    // Firebase отвечал «Некорректный email». Пробелы в адресе невозможны,
+    // убираем их целиком.
+    const cleanEmail = email.replace(/\s+/g, '');
     try {
       if (view === 'signin') {
-        await signIn(email, password);
+        await signIn(cleanEmail, password);
         onClose();
       } else if (view === 'signup') {
-        await signUp(email, password, `${firstName.trim()} ${lastName.trim()}`);
+        await signUp(
+          cleanEmail,
+          password,
+          `${firstName.trim()} ${lastName.trim()}`.trim(),
+        );
         onClose();
       } else {
-        await resetPassword(email);
+        await resetPassword(cleanEmail);
         setResetSent(true);
       }
     } catch (e) {
@@ -167,7 +175,7 @@ export function AuthScreen({onClose}: Props) {
               <>
                 <TextInput
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={v => setEmail(v.replace(/\s+/g, ''))}
                   placeholder={t('auth_email_placeholder', 'Email')}
                   placeholderTextColor="rgba(255,255,255,0.65)"
                   style={styles.input}
@@ -261,7 +269,7 @@ export function AuthScreen({onClose}: Props) {
                 )}
                 <TextInput
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={v => setEmail(v.replace(/\s+/g, ''))}
                   placeholder={t('auth_email_placeholder', 'Email')}
                   placeholderTextColor="rgba(255,255,255,0.65)"
                   style={styles.input}
@@ -374,6 +382,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    // Правки: fixed-заголовки экранов (zIndex 10) всплывали поверх листа и
+    // перекрывали крестик — лист авторизации всегда выше них.
+    zIndex: 20,
+    elevation: 20,
   },
   dim: {
     position: 'absolute',

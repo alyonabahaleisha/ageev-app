@@ -69,11 +69,18 @@ function ShareModalShell({
       url = null;
     }
     if (!url) return;
+    // Правки (Figma 489:11217): ViewShot может вернуть путь без схемы —
+    // без «file://» мессенджеры (Telegram) получали текстовый путь к файлу
+    // вместо самой картинки.
+    const fileUrl = url.startsWith('file://') ? url : `file://${url}`;
     Clipboard.setString(link);
     setLinkCopied(true);
-    Share.open({url, message, type: 'image/png', failOnCancel: false}).catch(
-      () => {},
-    );
+    Share.open({
+      url: fileUrl,
+      message,
+      type: 'image/png',
+      failOnCancel: false,
+    }).catch(() => {});
   };
 
   return (

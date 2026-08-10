@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Image,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK} from '../assets/icons';
 import {GradientBackground} from '../components/GradientBackground';
+import LinearGradient from '../components/LinearGradient';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -110,10 +112,28 @@ export function SchoolScreen({onBack}: Props) {
             ))}
           </View>
 
-          <TouchableOpacity activeOpacity={0.85} style={styles.button}>
+          {/* Правки (Figma 489:11217): кнопка не работала — ведёт на сайт
+              школы. */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.button}
+            onPress={() =>
+              Linking.openURL(
+                t('school_more_url', 'https://mikhail-ageev.ru'),
+              ).catch(() => {})
+            }>
             <Text style={styles.buttonText}>{t('school_button', 'Подробнее')}</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {/* Правки: скрим как на главной — контент при скроле остаётся
+            читабельным под шапкой. */}
+        <LinearGradient
+          colors={['#22618D', '#22618D', 'rgba(34,97,141,0)']}
+          locations={[0, 0.7, 1]}
+          pointerEvents="none"
+          style={[styles.headerScrim, {height: top + 7 + BTN_SIZE + 24}]}
+        />
 
         {/* Fixed header overlay */}
         <View
@@ -222,6 +242,12 @@ const styles = StyleSheet.create({
   },
 
   // ── Fixed header ──────────────────────────────────────────────────────────
+  headerScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
   header: {
     position: 'absolute',
     top: 0,

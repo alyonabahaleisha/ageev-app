@@ -22,7 +22,7 @@ import {
   ICON_PLAY_TRIANGLE,
   ICON_SHARE,
 } from '../assets/icons';
-import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
 import LinearGradient from '../components/LinearGradient';
 import {RemoteImage} from '../components/RemoteImage';
@@ -169,6 +169,7 @@ type Props = {state: MindsetState; onBack: () => void};
 
 export function StateScreen({state, onBack}: Props) {
   const {top, bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const t = useUIStrings();
   const {openPlayer} = usePlayer();
   const {meditations} = useMeditations();
@@ -252,7 +253,7 @@ export function StateScreen({state, onBack}: Props) {
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 120},
+          {paddingTop: scrollPad, paddingBottom: bottom + 120},
         ]}
         showsVerticalScrollIndicator={false}>
         {/* Title + subtitle */}

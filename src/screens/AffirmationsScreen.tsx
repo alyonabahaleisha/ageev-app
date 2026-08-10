@@ -26,6 +26,7 @@ import {
   dailyAffirmationIndex,
   useAffirmations,
 } from '../services/affirmations';
+import LinearGradient from '../components/LinearGradient';
 import {SavedToast, useSavedToast} from '../components/SavedToast';
 import {
   ShareAffirmationItem,
@@ -46,24 +47,16 @@ const HINT_BOTTOM_RATIO = (844 - 714) / 844; // 130/844
 
 const ALL_FILTER = 'Все';
 
-// Scale the font to the affirmation length with a proportional line height.
-// (We avoid `adjustsFontSizeToFit`: on iOS it shrinks the font but keeps the
-// fixed lineHeight, producing tiny text with huge line gaps.)
-// `scale` — пользовательский «Размер текста» из настроек.
+// Правки (Figma 489:11217): размер текста в карточках единый — 22px, без
+// подстройки под длину. `scale` — пользовательский «Размер текста» из
+// настроек.
 function fontForText(
-  text: string,
+  _text: string,
   scale: number,
 ): {fontSize: number; lineHeight: number} {
-  const len = text.length;
-  let f: {fontSize: number; lineHeight: number};
-  if (len <= 60) f = {fontSize: 26, lineHeight: 34};
-  else if (len <= 120) f = {fontSize: 23, lineHeight: 31};
-  else if (len <= 220) f = {fontSize: 20, lineHeight: 27};
-  else if (len <= 340) f = {fontSize: 18, lineHeight: 24};
-  else f = {fontSize: 16, lineHeight: 22};
   return {
-    fontSize: Math.round(f.fontSize * scale),
-    lineHeight: Math.round(f.lineHeight * scale),
+    fontSize: Math.round(22 * scale),
+    lineHeight: Math.round(30 * scale),
   };
 }
 
@@ -257,6 +250,15 @@ export function AffirmationsScreen({onBack, initial}: Props) {
         )}
       />
 
+      {/* Правки: скрим как на главной — при свайпе текст под шапкой и чипсами
+          остаётся читабельным. */}
+      <LinearGradient
+        colors={['#22618D', '#22618D', 'rgba(34,97,141,0)']}
+        locations={[0, 0.7, 1]}
+        pointerEvents="none"
+        style={[styles.headerScrim, {height: filterTop + 48 + 24}]}
+      />
+
       {/* Fixed header overlay */}
       <View
         style={[styles.header, {paddingTop: top + 7}]}
@@ -331,8 +333,8 @@ const styles = StyleSheet.create({
   },
   affirmationText: {
     fontFamily: 'Manrope-SemiBold',
-    fontSize: 24,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 30,
     fontWeight: '600',
     color: colors.white,
     textAlign: 'center',
@@ -360,6 +362,12 @@ const styles = StyleSheet.create({
   },
 
   // ── Fixed header ──────────────────────────────────────────────────────────
+  headerScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
   header: {
     position: 'absolute',
     top: 0,

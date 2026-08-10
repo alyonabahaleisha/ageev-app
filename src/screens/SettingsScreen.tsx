@@ -10,7 +10,7 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK, ICON_TEXT_SIZE} from '../assets/icons';
-import {FixedHeader, headerScrollPadding} from '../components/FixedHeader';
+import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
 import {ToggleSwitch} from '../components/ToggleSwitch';
 import {
@@ -21,6 +21,7 @@ import {
 import {
   cancelDailyAffirmationNotifications,
   ensureDailyAffirmationNotifications,
+  ensurePracticeReminders,
 } from '../services/dailyNotifications';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
@@ -54,7 +55,8 @@ function Chip({
 
 /** Настройки (Figma 448:10501). */
 export function SettingsScreen({onBack}: Props) {
-  const {top, bottom} = useSafeAreaInsets();
+  const {bottom} = useSafeAreaInsets();
+  const scrollPad = useHeaderScrollPadding();
   const {settings, updateSettings} = useAppSettings();
   const t = useUIStrings();
 
@@ -74,6 +76,7 @@ export function SettingsScreen({onBack}: Props) {
       ? settings.reminderTimes.filter(x => x !== key)
       : [...settings.reminderTimes, key];
     updateSettings({reminderTimes: times});
+    ensurePracticeReminders();
   }
 
   return (
@@ -82,7 +85,7 @@ export function SettingsScreen({onBack}: Props) {
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          {paddingTop: headerScrollPadding(top), paddingBottom: bottom + 40},
+          {paddingTop: scrollPad, paddingBottom: bottom + 40},
         ]}
         showsVerticalScrollIndicator={false}>
         <View style={styles.cards}>
@@ -116,7 +119,10 @@ export function SettingsScreen({onBack}: Props) {
                 </Text>
                 <ToggleSwitch
                   value={settings.remindersEnabled}
-                  onChange={v => updateSettings({remindersEnabled: v})}
+                  onChange={v => {
+                    updateSettings({remindersEnabled: v});
+                    ensurePracticeReminders();
+                  }}
                 />
               </View>
               <View
