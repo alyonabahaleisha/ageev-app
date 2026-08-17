@@ -47,17 +47,25 @@ export function MiniPlayer() {
         activeOpacity={0.8}
         style={styles.textCol}
         onPress={reopenPlayer}>
-        <Text style={styles.title} numberOfLines={1}>
+        {/* Бар компактный по правкам (40px) — системное масштабирование
+            шрифта его распирало, поэтому здесь размер фиксированный. */}
+        <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={1}>
           {t('miniplayer_title', 'Продолжить практику')}
         </Text>
         <View style={styles.subRow}>
-          <Text style={styles.subText} numberOfLines={1}>
+          <Text
+            style={styles.subText}
+            numberOfLines={1}
+            maxFontSizeMultiplier={1}>
             {track.title}
           </Text>
           {track.durationSeconds > 0 && (
             <>
               <View style={styles.dot} />
-              <Text style={styles.subText}>
+              <Text
+                style={styles.subDuration}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1}>
                 {formatDuration(track.durationSeconds)}
               </Text>
             </>
@@ -88,7 +96,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    height: 40,
+    minHeight: 40,
     paddingVertical: 5,
     paddingLeft: 12,
     paddingRight: 12,
@@ -141,6 +149,14 @@ const styles = StyleSheet.create({
     lineHeight: 13,
     color: colors.white,
     flexShrink: 1,
+  },
+  // «12 мин» не сжимается и не переносится на новую строку.
+  subDuration: {
+    ...typography.small,
+    fontSize: 10,
+    lineHeight: 13,
+    color: colors.white,
+    flexShrink: 0,
   },
   dot: {
     width: 5,

@@ -69,10 +69,44 @@ export function DeleteAccountModal({onCancel, onDelete, deleting}: DeleteProps) 
           onPress={onDelete}
           disabled={deleting}
           style={styles.linkHit}>
-          <Text style={styles.link}>
+          <Text style={[styles.link, styles.linkDanger]}>
             {deleting
               ? t('account_deleting', 'Удаляем…')
               : t('account_delete_confirm', 'Удалить аккаунт')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </ModalCard>
+  );
+}
+
+type SignOutProps = {
+  onCancel: () => void;
+  onSignOut: () => void;
+};
+
+/** Подтверждение выхода (Figma 508:10727): «Вы уверены, что хотите выйти?» */
+export function SignOutModal({onCancel, onSignOut}: SignOutProps) {
+  const t = useUIStrings();
+  return (
+    <ModalCard onClose={onCancel}>
+      <View style={styles.textBlock}>
+        <Text style={styles.title}>{t('account_signout_title', 'Выйти')}</Text>
+        <Text style={styles.subtitle}>
+          {t('account_signout_subtitle', 'Вы уверены, что хотите выйти?')}
+        </Text>
+      </View>
+      <View style={styles.actions}>
+        <PrimaryButton
+          title={t('account_delete_cancel', 'Отмена')}
+          onPress={onCancel}
+        />
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={onSignOut}
+          style={styles.linkHit}>
+          <Text style={styles.link}>
+            {t('account_signout_confirm', 'Выйти')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -182,5 +216,9 @@ const styles = StyleSheet.create({
   link: {
     ...typography.body,
     color: colors.brand.pale,
+  },
+  // «Удалить аккаунт» в макете — красный.
+  linkDanger: {
+    color: '#FFB4A9',
   },
 });

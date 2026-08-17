@@ -70,15 +70,14 @@ const styles = StyleSheet.create({
   },
   cardShadow: {
     borderRadius: RADIUS,
+    // Тень только на iOS: android-elevation просвечивает сквозь
+    // полупрозрачную нижнюю панель карточки белёсым ореолом.
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOffset: {width: 0, height: 8},
         shadowOpacity: 0.12,
         shadowRadius: 24,
-      },
-      android: {
-        elevation: 4,
       },
     }),
   },

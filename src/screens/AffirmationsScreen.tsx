@@ -109,6 +109,10 @@ export function AffirmationsScreen({onBack, initial}: Props) {
   // affirmations one, and a one-shot scroll would then point at the wrong card
   // (deep links / «Избранное» opened the wrong affirmation).
   const userTouchedPager = useRef(false);
+  // Высота страницы = реальная высота пейджера, не Dimensions: на Android
+  // окно включает статус/нав-бары, и страницы «уезжали» вверх с каждым
+  // свайпом (paging снапится по вьюпорту, а страницы были выше него).
+  const [pageH, setPageH] = useState(SCREEN_H);
   useEffect(() => {
     if (userTouchedPager.current || affirmations.length === 0) {
       return;
@@ -121,17 +125,17 @@ export function AffirmationsScreen({onBack, initial}: Props) {
       }
     }
     if (idx < 0) idx = dailyAffirmationIndex(affirmations.length);
-    const offset = SCREEN_H * idx;
+    const offset = pageH * idx;
     requestAnimationFrame(() =>
       listRef.current?.scrollToOffset({offset, animated: false}),
     );
-  }, [affirmations, initial]);
+  }, [affirmations, initial, pageH]);
 
   const filterTop = top + 7 + BTN_SIZE + 14;
   // Bound the affirmation text between the filter chips and the swipe hint so
   // long, multi-sentence affirmations stay centered and never overlap either.
   const textBoxTop = filterTop + 48 + 16;
-  const textBoxBottom = SCREEN_H * HINT_BOTTOM_RATIO + bottom + 88;
+  const textBoxBottom = pageH * HINT_BOTTOM_RATIO + bottom + 88;
 
   function handleFilterPress(i: number) {
     userTouchedPager.current = true;
@@ -171,17 +175,21 @@ export function AffirmationsScreen({onBack, initial}: Props) {
         data={filtered}
         keyExtractor={item => item.id}
         pagingEnabled
+        onLayout={e => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && Math.abs(h - pageH) > 1) setPageH(h);
+        }}
         onScrollBeginDrag={() => {
           userTouchedPager.current = true;
         }}
         showsVerticalScrollIndicator={false}
         getItemLayout={(_, index) => ({
-          length: SCREEN_H,
-          offset: SCREEN_H * index,
+          length: pageH,
+          offset: pageH * index,
           index,
         })}
         ListEmptyComponent={
-          <View style={styles.page}>
+          <View style={[styles.page, {height: pageH}]}>
             <View
               style={[styles.textBox, {top: textBoxTop, bottom: textBoxBottom}]}>
               {loading ? (
@@ -195,7 +203,7 @@ export function AffirmationsScreen({onBack, initial}: Props) {
           </View>
         }
         renderItem={({item, index}) => (
-          <View style={styles.page}>
+          <View style={[styles.page, {height: pageH}]}>
             {/* Affirmation text + icons — vertically centered, length-scaled */}
             <View
               style={[styles.textBox, {top: textBoxTop, bottom: textBoxBottom}]}>
@@ -236,7 +244,7 @@ export function AffirmationsScreen({onBack, initial}: Props) {
             </View>
             {/* Swipe-up hint — only on the initially visible card */}
             {index === dailyIdx && (
-              <View style={[styles.hint, {bottom: SCREEN_H * HINT_BOTTOM_RATIO}]}>
+              <View style={[styles.hint, {bottom: pageH * HINT_BOTTOM_RATIO}]}>
                 <Text style={styles.hintText}>
                   {t(
                     'affirmations_swipe_hint',

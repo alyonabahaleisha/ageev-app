@@ -12,6 +12,7 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
+  updateEmail,
   updateProfile,
   User,
 } from 'firebase/auth';
@@ -103,6 +104,20 @@ export function resetPassword(email: string) {
 
 export function signOutUser() {
   return signOut(auth);
+}
+
+/** «Изменить профиль» (Figma 507:10649): имя и почта. Смена почты может
+ *  потребовать недавнего входа — тогда Firebase вернёт requires-recent-login. */
+export async function updateAccountProfile(name: string, email: string) {
+  const user = auth.currentUser;
+  if (!user) return;
+  if (name.trim() && name.trim() !== (user.displayName ?? '')) {
+    await updateProfile(user, {displayName: name.trim()});
+  }
+  const cleanEmail = email.replace(/\s+/g, '');
+  if (cleanEmail && cleanEmail !== (user.email ?? '')) {
+    await updateEmail(user, cleanEmail);
+  }
 }
 
 export function deleteAccount() {

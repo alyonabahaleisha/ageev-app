@@ -1,5 +1,6 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
+  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,9 +11,20 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK, ICON_TEXT_SIZE} from '../assets/icons';
+import {
+  DeleteAccountModal,
+  SignOutModal,
+} from '../components/AccountModals';
 import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
+import {PrimaryButton} from '../components/PrimaryButton';
 import {ToggleSwitch} from '../components/ToggleSwitch';
+import {
+  authErrorMessage,
+  deleteAccount,
+  signOutUser,
+  useAuth,
+} from '../context/AuthContext';
 import {
   ReminderTime,
   TextSize,
@@ -53,12 +65,40 @@ function Chip({
   );
 }
 
-/** Настройки (Figma 448:10501). */
+/** Настройки (Figma 448:10501; выход/удаление — 508:10727). */
 export function SettingsScreen({onBack}: Props) {
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
   const {settings, updateSettings} = useAppSettings();
+  const {user} = useAuth();
   const t = useUIStrings();
+  const [modal, setModal] = useState<'none' | 'signout' | 'delete'>('none');
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleSignOut() {
+    setModal('none');
+    try {
+      await signOutUser();
+      onBack();
+    } catch (e) {
+      Alert.alert(t('account_error', 'Ошибка'), authErrorMessage(e));
+    }
+  }
+
+  async function handleDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      setModal('none');
+      onBack();
+    } catch (e) {
+      setModal('none');
+      Alert.alert(t('account_error', 'Ошибка'), authErrorMessage(e));
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const reminderTimes: {key: ReminderTime; label: string}[] = [
     {key: 'morning', label: t('settings_reminder_morning', 'Утро')},
@@ -189,6 +229,25 @@ export function SettingsScreen({onBack}: Props) {
             </View>
           </View>
         </View>
+
+        {/* Выход и удаление аккаунта (Figma 508:10727) — только для
+            вошедших. */}
+        {!!user && (
+          <View style={styles.accountBlock}>
+            <PrimaryButton
+              title={t('account_signout_title', 'Выйти')}
+              onPress={() => setModal('signout')}
+            />
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setModal('delete')}
+              style={styles.deleteHit}>
+              <Text style={styles.deleteLink}>
+                {t('account_delete_confirm', 'Удалить аккаунт')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* Шапка: назад + заголовок по центру */}
@@ -206,6 +265,20 @@ export function SettingsScreen({onBack}: Props) {
           <View style={styles.backBtn} />
         </View>
       </FixedHeader>
+
+      {modal === 'signout' && (
+        <SignOutModal
+          onCancel={() => setModal('none')}
+          onSignOut={handleSignOut}
+        />
+      )}
+      {modal === 'delete' && (
+        <DeleteAccountModal
+          onCancel={() => setModal('none')}
+          onDelete={handleDelete}
+          deleting={deleting}
+        />
+      )}
     </GradientBackground>
   );
 }
@@ -213,6 +286,23 @@ export function SettingsScreen({onBack}: Props) {
 const styles = StyleSheet.create({
   scroll: {flex: 1},
   content: {flexGrow: 1},
+
+  // ── Выход / удаление аккаунта ─────────────────────────────────────────────
+  accountBlock: {
+    marginTop: 'auto',
+    paddingTop: 40,
+    marginHorizontal: SECTION_MARGIN,
+    gap: 16,
+    alignItems: 'stretch',
+  },
+  deleteHit: {
+    alignSelf: 'center',
+    paddingVertical: 4,
+  },
+  deleteLink: {
+    ...typography.body,
+    color: '#FFB4A9',
+  },
 
   // ── Шапка ──────────────────────────────────────────────────────────────────
   header: {
@@ -246,6 +336,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     gap: 16,
+    // Тень только на iOS: android-elevation просвечивает сквозь
+    // полупрозрачную карточку белёсым ореолом.
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -253,7 +345,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.12,
         shadowRadius: 24,
       },
-      android: {elevation: 4},
     }),
   },
   cardTitle: {

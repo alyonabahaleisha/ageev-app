@@ -1,6 +1,5 @@
 import React, {useState} from 'react';
 import {
-  Alert,
   Linking,
   ScrollView,
   StyleSheet,
@@ -20,17 +19,11 @@ import {
   ICON_USER_30,
   ICON_YOUTUBE,
 } from '../assets/icons';
-import {AccountSheet, DeleteAccountModal} from '../components/AccountModals';
 import {RemoteImage} from '../components/RemoteImage';
+import {EditProfileScreen} from './EditProfileScreen';
 import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {PrimaryButton} from '../components/PrimaryButton';
-import {
-  authErrorMessage,
-  deleteAccount,
-  signOutUser,
-  useAuth,
-  userDisplayName,
-} from '../context/AuthContext';
+import {useAuth, userDisplayName} from '../context/AuthContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -58,36 +51,13 @@ export function ProfileScreen({
   const scrollPad = useHeaderScrollPadding();
   const {user} = useAuth();
   const t = useUIStrings();
-  const [modal, setModal] = useState<'none' | 'account' | 'delete'>('none');
-  const [deleting, setDeleting] = useState(false);
+  // «Изменить профиль» (Figma 507:10649): открывается по карандашу в шапке.
+  const [showEdit, setShowEdit] = useState(false);
 
   const loggedIn = !!user;
 
   function openUrl(url: string) {
     if (url) Linking.openURL(url).catch(() => {});
-  }
-
-  async function handleSignOut() {
-    setModal('none');
-    try {
-      await signOutUser();
-    } catch (e) {
-      Alert.alert(t('account_error', 'Ошибка'), authErrorMessage(e));
-    }
-  }
-
-  async function handleDelete() {
-    if (deleting) return;
-    setDeleting(true);
-    try {
-      await deleteAccount();
-      setModal('none');
-    } catch (e) {
-      setModal('none');
-      Alert.alert(t('account_error', 'Ошибка'), authErrorMessage(e));
-    } finally {
-      setDeleting(false);
-    }
   }
 
   // Строки списка. Разделы без своих экранов пока никуда не ведут; в гостевом
@@ -245,9 +215,11 @@ export function ProfileScreen({
             <View style={styles.headerBtn}>
               <SvgXml xml={ICON_SEARCH} width={24} height={24} />
             </View>
+            {/* Правки (Figma 507:10675): карандаш открывает «Изменить
+                профиль», а не вход/удаление; гостю — авторизацию. */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={loggedIn ? () => setModal('account') : onOpenAuth}
+              onPress={loggedIn ? () => setShowEdit(true) : onOpenAuth}
               style={styles.headerBtn}>
               <SvgXml xml={ICON_EDIT} width={24} height={24} />
             </TouchableOpacity>
@@ -255,20 +227,8 @@ export function ProfileScreen({
         </View>
       </FixedHeader>
 
-      {modal === 'account' && user && (
-        <AccountSheet
-          email={user.email ?? ''}
-          onSignOut={handleSignOut}
-          onDelete={() => setModal('delete')}
-          onClose={() => setModal('none')}
-        />
-      )}
-      {modal === 'delete' && (
-        <DeleteAccountModal
-          onCancel={() => setModal('none')}
-          onDelete={handleDelete}
-          deleting={deleting}
-        />
+      {showEdit && user && (
+        <EditProfileScreen onClose={() => setShowEdit(false)} />
       )}
     </>
   );
@@ -377,12 +337,12 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingRight: 10,
     gap: 12,
-    // shadow/soft
+    // shadow/soft — только iOS: на Android elevation-тень просвечивает сквозь
+    // полупрозрачную карточку белёсым ореолом.
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 8},
     shadowOpacity: 0.12,
     shadowRadius: 24,
-    elevation: 4,
   },
   tabLeft: {
     flex: 1,
