@@ -1,7 +1,8 @@
 import {useEffect, useState} from 'react';
-import {collection, onSnapshot, orderBy, query} from 'firebase/firestore';
+import {collection, orderBy, query} from 'firebase/firestore';
 import {db} from '../lib/firebase';
 import {prefetchImages} from '../components/RemoteImage';
+import {subscribeCachedQuery} from './contentCache';
 
 export type Webinar = {
   id: string;
@@ -26,23 +27,16 @@ export function useWebinars() {
 
   useEffect(() => {
     const q = query(collection(db, 'webinars'), orderBy('sortOrder'));
-    const unsub = onSnapshot(
+    return subscribeCachedQuery<Webinar>(
+      'webinars',
       q,
-      snapshot => {
-        const docs = snapshot.docs.map(
-          d => ({id: d.id, ...d.data()} as Webinar),
-        );
-        console.log('FETCHCHECK webinars', docs.length);
+      docs => {
         setWebinars(docs);
         prefetchImages(docs.map(d => d.coverUrl));
         setLoading(false);
       },
-      err => {
-        console.log('FETCHCHECK webinars ERROR', (err as Error)?.message);
-        setLoading(false);
-      },
+      () => setLoading(false),
     );
-    return unsub;
   }, []);
 
   return {webinars, loading};

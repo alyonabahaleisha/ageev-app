@@ -24,13 +24,20 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
-        <!-- Диплинки: ageev://<type>/<id> (страница-редирект mikhail-app.web.app
-             шлёт сюда) и прямые https-ссылки на /l/... -->
+        <!-- Диплинки: ageev://<type>/<id> (страница-редирект шлёт сюда) и
+             прямые https-ссылки на /l/... с app.agvclub.ru (основной, РФ) и
+             старого mikhail-app.web.app (для уже разосланных ссылок). -->
         <intent-filter>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="ageev" />
+        </intent-filter>
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" android:host="app.agvclub.ru" android:pathPrefix="/l/" />
         </intent-filter>
         <intent-filter>
             <action android:name="android.intent.action.VIEW" />

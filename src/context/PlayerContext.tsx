@@ -12,6 +12,8 @@ import {
   savePlaybackPosition,
 } from '../services/playbackPositions';
 import {uiString} from '../services/uiStrings';
+import {track as trackEvent} from '../services/analytics';
+import {resolveMediaUrl} from '../services/mediaRegion';
 
 export type PlayerTrack = {
   id: string;
@@ -89,6 +91,11 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   }, []);
 
   const openPlayer = useCallback(async (t: PlayerTrack) => {
+    trackEvent('practice_start', {
+      track_id: t.id,
+      track_title: t.title,
+      content_kind: t.kind ?? 'other',
+    });
     // Show the player instantly; the audio pipeline spins up behind it so the
     // tap always gets an immediate response.
     setTrack(t);
@@ -117,16 +124,18 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       }
 
       // Play the cached file when we have one; otherwise stream and download
-      // a local copy in the background for next time.
+      // a local copy in the background for next time. Медиа-URL приводим к
+      // источнику региона (РФ-зеркало / Firebase) перед стримом и загрузкой.
       const cachedUrl = await getCachedAudioUrl(t.id);
+      const streamUrl = resolveMediaUrl(t.audioUrl) ?? t.audioUrl;
 
       await TrackPlayer.reset();
       await TrackPlayer.add({
         id: t.id,
-        url: cachedUrl ?? t.audioUrl,
+        url: cachedUrl ?? streamUrl,
         title: t.title,
         artist: t.artist || uiString('player_default_artist', 'Михаил Агеев'),
-        artwork: t.coverUrl,
+        artwork: resolveMediaUrl(t.coverUrl) ?? t.coverUrl,
         duration: t.durationSeconds,
       });
 
@@ -141,7 +150,7 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       await TrackPlayer.play();
 
       if (!cachedUrl) {
-        downloadAudio(t.id, t.audioUrl);
+        downloadAudio(t.id, streamUrl);
       }
     } catch (e) {
       console.warn('[Player] error:', e);

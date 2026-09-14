@@ -15,6 +15,7 @@ import {
 import LinearGradient from '../components/LinearGradient';
 import Svg, {Circle, SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {track as trackEvent} from '../services/analytics';
 import TrackPlayer, {
   usePlaybackState,
   useProgress,
@@ -692,6 +693,11 @@ export function PlayerScreen() {
       endedHandled.current !== track.id
     ) {
       endedHandled.current = track.id;
+      trackEvent('practice_complete', {
+        track_id: track.id,
+        track_title: track.title,
+        content_kind: track.kind ?? 'other',
+      });
       setPostPractice(true);
     } else if (playback.state === State.Playing) {
       // Трек запустили заново — следующий финал снова покажет флоу.

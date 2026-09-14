@@ -9,8 +9,8 @@
          <ExecutionAction
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
-               title = "Select prod envfile"
-               scriptText = "echo &quot;${SRCROOT}/../.env.prod&quot; &gt; /tmp/envfile">
+               title = "Select QA envfile"
+               scriptText = "echo &quot;${SRCROOT}/../.env.qa&quot; &gt; /tmp/envfile">
                <EnvironmentBuildable>
                   <BuildableReference
                      BuildableIdentifier = "primary"

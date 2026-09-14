@@ -86,10 +86,14 @@ export function BottomNavBar({activeIndex: controlledIndex, onTabPress}: Props) 
               reducedTransparencyFallbackColor="rgba(255,255,255,0.14)"
             />
           ) : (
-            <BlurView
-              style={StyleSheet.absoluteFill}
-              blurRadius={20}
-              overlayColor="rgba(255,255,255,0.18)"
+            // Android: живой BlurView перерисовывает размытие каждый кадр и
+            // ронял fps при кроссфейде экранов под панелью. Статичная
+            // полупрозрачная подложка вместо него — переходы плавные.
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                {backgroundColor: 'rgba(255,255,255,0.55)'},
+              ]}
             />
           )}
           {/* Semi-transparent overlay: rgba(255,255,255,0.14) from Figma */}

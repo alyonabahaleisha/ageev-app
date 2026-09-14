@@ -1,6 +1,12 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// Firebase Analytics: плагин читает google-services.json (регистрация
+// приложения в Firebase Console). Условно — чтобы сборка не падала,
+// пока файл не положили в android/app/.
+if (file('google-services.json').exists()) {
+    apply plugin: "com.google.gms.google-services"
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -21,7 +27,7 @@ react {
     //   The list of variants to that are debuggable. For those we're going to
     //   skip the bundling of the JS bundle and the assets. Default is "debug", "debugOptimized".
     //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    // debuggableVariants = ["liteDebug", "liteDebugOptimized", "prodDebug", "prodDebugOptimized"]
+    debuggableVariants = ["qaDebug", "qaDebugOptimized", "prodDebug", "prodDebugOptimized"]
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -72,6 +78,18 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// react-native-config: какой .env попадает в какой вариант сборки.
+// Ключи — имена вариантов в нижнем регистре (флейвор + buildType).
+project.ext.envConfigFiles = [
+    qadebug: ".env.qa",
+    qadebugoptimized: ".env.qa",
+    qarelease: ".env.qa",
+    proddebug: ".env.prod",
+    proddebugoptimized: ".env.prod",
+    prodrelease: ".env.prod",
+]
+apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -84,11 +102,27 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
     defaultConfig {
-        applicationId "com.ageevapp"
+        // Единый id с iOS-бандлом. namespace остаётся com.ageevapp —
+        // это только пакет Kotlin-кода, наружу он не виден.
+        applicationId "com.mikhail.manifestation"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
+        versionCode 5
         versionName "1.0.0"
+    }
+    // QA/Prod окружения (этап 2 инфра-плана): qa ставится рядом с продом
+    // (суффикс .qa), своё имя на иконке — через src/qa/res/values/strings.xml,
+    // свой .env — через envConfigFiles выше. google-services.json при появлении
+    // кладутся по флейворам: src/prod/google-services.json, src/qa/….
+    flavorDimensions "env"
+    productFlavors {
+        prod {
+            dimension "env"
+        }
+        qa {
+            dimension "env"
+            applicationIdSuffix ".qa"
+        }
     }
     signingConfigs {
         debug {
@@ -97,15 +131,26 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // Upload-ключ для Google Play. Файл и пароли живут вне репозитория —
+        // в ~/keystores и ~/.gradle/gradle.properties (AGEEV_UPLOAD_*).
+        // Без них release собирается debug-ключом (для локальной проверки).
+        release {
+            if (project.hasProperty('AGEEV_UPLOAD_STORE_FILE')) {
+                storeFile file(AGEEV_UPLOAD_STORE_FILE)
+                storePassword AGEEV_UPLOAD_STORE_PASSWORD
+                keyAlias AGEEV_UPLOAD_KEY_ALIAS
+                keyPassword AGEEV_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig project.hasProperty('AGEEV_UPLOAD_STORE_FILE')
+                ? signingConfigs.release
+                : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

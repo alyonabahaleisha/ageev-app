@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useState} from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {collection, onSnapshot} from 'firebase/firestore';
 import {db} from '../lib/firebase';
 
@@ -21,28 +22,65 @@ export type Club = {
 
 export type ClubCountry = {country: string; clubs: Club[]};
 
+// Общий стор вместо подписки в каждом хуке: раньше каждое открытие карты
+// заводило новый onSnapshot и ждало сеть, из-за чего карта открывалась долго.
+// Список кэшируется в AsyncStorage — при следующих запусках клубы доступны
+// мгновенно, а живой снапшот тихо обновляет их поверх кэша.
+const CACHE_KEY = 'clubs-cache-v1';
+let store: Club[] = [];
+let storeLoaded = false;
+let syncStarted = false;
+const storeListeners = new Set<() => void>();
+
+function emitClubs() {
+  storeListeners.forEach(l => l());
+}
+
+AsyncStorage.getItem(CACHE_KEY)
+  .then(raw => {
+    if (!raw || store.length > 0) return;
+    const cached = JSON.parse(raw) as Club[];
+    if (Array.isArray(cached) && cached.length > 0 && store.length === 0) {
+      store = cached;
+      storeLoaded = true;
+      emitClubs();
+    }
+  })
+  .catch(() => {});
+
+/** Единственная живая подписка на коллекцию; стартует при первом хуке. */
+export function startClubsSync(): void {
+  if (syncStarted) return;
+  syncStarted = true;
+  onSnapshot(
+    collection(db, 'clubs'),
+    snapshot => {
+      store = snapshot.docs.map(d => ({id: d.id, ...d.data()} as Club));
+      storeLoaded = true;
+      emitClubs();
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(store)).catch(() => {});
+    },
+    err => {
+      console.log('FETCHCHECK clubs ERROR', (err as Error)?.message);
+      storeLoaded = true;
+      emitClubs();
+    },
+  );
+}
+
 export function useClubs() {
-  const [clubs, setClubs] = useState<Club[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, 'clubs'),
-      snapshot => {
-        const docs = snapshot.docs.map(d => ({id: d.id, ...d.data()} as Club));
-        console.log('FETCHCHECK clubs', docs.length);
-        setClubs(docs);
-        setLoading(false);
-      },
-      err => {
-        console.log('FETCHCHECK clubs ERROR', (err as Error)?.message);
-        setLoading(false);
-      },
-    );
-    return unsub;
+    startClubsSync();
+    const l = () => setTick(t => t + 1);
+    storeListeners.add(l);
+    return () => {
+      storeListeners.delete(l);
+    };
   }, []);
 
-  return {clubs, loading};
+  return {clubs: store, loading: !storeLoaded && store.length === 0};
 }
 
 // Groups clubs by country and sorts: countries A→Z, then within a country by

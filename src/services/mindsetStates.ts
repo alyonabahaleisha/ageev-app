@@ -1,7 +1,8 @@
 import {useEffect, useState} from 'react';
-import {collection, onSnapshot, orderBy, query} from 'firebase/firestore';
+import {collection, orderBy, query} from 'firebase/firestore';
 import {db} from '../lib/firebase';
 import {prefetchImages} from '../components/RemoteImage';
+import {subscribeCachedQuery} from './contentCache';
 
 export type ExerciseStep = {
   title: string;
@@ -119,21 +120,18 @@ export function useMindsetStates() {
 
   useEffect(() => {
     const q = query(collection(db, 'mindsetStates'), orderBy('sortOrder'));
-    const unsub = onSnapshot(
+    // Кэш хранит сырые доки; normalize применяется к каждой выдаче.
+    return subscribeCachedQuery<{id: string} & Record<string, unknown>>(
+      'mindsetStates',
       q,
-      snapshot => {
-        const docs = snapshot.docs.map(d => normalize(d.id, d.data()));
-        console.log('FETCHCHECK mindsetStates', docs.length);
+      raw => {
+        const docs = raw.map(d => normalize(d.id, d));
         setStates(docs);
         prefetchImages(docs.map(d => d.coverImage));
         setLoading(false);
       },
-      err => {
-        console.log('FETCHCHECK mindsetStates ERROR', (err as Error)?.message);
-        setLoading(false);
-      },
+      () => setLoading(false),
     );
-    return unsub;
   }, []);
 
   return {states, loading};

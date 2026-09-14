@@ -1,8 +1,9 @@
 import {useEffect, useState} from 'react';
-import {collection, onSnapshot, query, where} from 'firebase/firestore';
+import {collection, query, where} from 'firebase/firestore';
 import {db} from '../lib/firebase';
 import {prefetchImages} from '../components/RemoteImage';
 import {formatDuration} from './meditations';
+import {subscribeCachedQuery} from './contentCache';
 
 export type RecommendedCard = {
   id: string;
@@ -21,50 +22,58 @@ export function useRecommended() {
   useEffect(() => {
     let medItems: RecommendedCard[] = [];
     let webItems: RecommendedCard[] = [];
-    let resolved = 0;
+    // Каждый источник отмечается после первой выдачи (кэш или сеть);
+    // карточки перерисовываются на каждое обновление любого из двух.
+    const seen = new Set<string>();
 
-    function merge() {
-      resolved++;
-      if (resolved === 2) {
-        const all = [...medItems, ...webItems];
-        setCards(all);
-        prefetchImages(all.map(c => c.coverUrl));
+    function merge(sourceKey: string) {
+      seen.add(sourceKey);
+      const all = [...medItems, ...webItems];
+      setCards(all);
+      prefetchImages(all.map(c => c.coverUrl));
+      if (seen.size === 2) {
         setLoading(false);
       }
     }
 
-    const unsubMed = onSnapshot(
+    type RawDoc = {
+      id: string;
+      title?: string;
+      description?: string;
+      durationSeconds?: number;
+      coverUrl?: string;
+      audioUrl?: string;
+    };
+    const toCard =
+      (source: RecommendedCard['source']) =>
+      (d: RawDoc): RecommendedCard => ({
+        id: d.id,
+        source,
+        title: d.title || '',
+        description: d.description || '',
+        durationSeconds: d.durationSeconds || 0,
+        coverUrl: d.coverUrl || '',
+        audioUrl: d.audioUrl || '',
+      });
+
+    const unsubMed = subscribeCachedQuery<RawDoc>(
+      'recommended-meditations',
       query(collection(db, 'meditations'), where('popular', '==', true)),
-      snap => {
-        medItems = snap.docs.map(d => ({
-          id: d.id,
-          source: 'meditation' as const,
-          title: d.data().title,
-          description: d.data().description || '',
-          durationSeconds: d.data().durationSeconds || 0,
-          coverUrl: d.data().coverUrl || '',
-          audioUrl: d.data().audioUrl || '',
-        }));
-        merge();
+      docs => {
+        medItems = docs.map(toCard('meditation'));
+        merge('med');
       },
-      () => merge(),
+      () => merge('med'),
     );
 
-    const unsubWeb = onSnapshot(
+    const unsubWeb = subscribeCachedQuery<RawDoc>(
+      'recommended-webinars',
       query(collection(db, 'webinars'), where('popular', '==', true)),
-      snap => {
-        webItems = snap.docs.map(d => ({
-          id: d.id,
-          source: 'webinar' as const,
-          title: d.data().title,
-          description: d.data().description || '',
-          durationSeconds: d.data().durationSeconds || 0,
-          coverUrl: d.data().coverUrl || '',
-          audioUrl: d.data().audioUrl || '',
-        }));
-        merge();
+      docs => {
+        webItems = docs.map(toCard('webinar'));
+        merge('web');
       },
-      () => merge(),
+      () => merge('web'),
     );
 
     return () => {

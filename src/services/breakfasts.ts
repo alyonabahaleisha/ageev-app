@@ -1,7 +1,8 @@
 import {useEffect, useState} from 'react';
-import {collection, onSnapshot, orderBy, query} from 'firebase/firestore';
+import {collection, orderBy, query} from 'firebase/firestore';
 import {db} from '../lib/firebase';
 import {prefetchImages} from '../components/RemoteImage';
+import {subscribeCachedQuery} from './contentCache';
 
 export type Breakfast = {
   id: string;
@@ -24,25 +25,22 @@ export function useBreakfasts() {
 
   useEffect(() => {
     const q = query(collection(db, 'breakfasts'), orderBy('sortOrder'));
-    const unsub = onSnapshot(
+    return subscribeCachedQuery<Breakfast>(
+      'breakfasts',
       q,
-      snapshot => {
-        const docs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Breakfast[];
-        console.log('FETCHCHECK breakfasts', docs.length);
+      docs => {
         setBreakfasts(docs);
         prefetchImages(docs.map(d => d.coverUrl).filter(Boolean));
         setLoading(false);
+        setError(null);
       },
-      err => {
-        console.log('FETCHCHECK breakfasts ERROR', err.message);
-        setError(err.message);
+      (message, hasData) => {
+        if (!hasData) {
+          setError(message);
+        }
         setLoading(false);
       },
     );
-    return unsub;
   }, []);
 
   return {breakfasts, loading, error};

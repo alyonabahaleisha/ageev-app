@@ -10,6 +10,7 @@ import {
 import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
 import TrackPlayer from 'react-native-track-player';
 import {PlaybackService} from './src/services/playbackService';
+import {track, trackScreen} from './src/services/analytics';
 import {PlayerProvider, usePlayer} from './src/context/PlayerContext';
 import {PlayerScreen} from './src/screens/PlayerScreen';
 import {GradientBackground} from './src/components/GradientBackground';
@@ -46,6 +47,7 @@ import {AuthProvider} from './src/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {registerOpenFavoritesHandler} from './src/services/appNavigation';
 import {fetchTrackForLink, parseDeepLink} from './src/services/deepLinks';
+import {initRegionOverride} from './src/services/mediaRegion';
 import notifee, {EventType} from '@notifee/react-native';
 import {
   ensureDailyAffirmationNotifications,
@@ -54,7 +56,6 @@ import {
 import {FavoriteItem} from './src/services/favorites';
 import {uiString} from './src/services/uiStrings';
 import {WebPageScreen} from './src/screens/WebPageScreen';
-import {DonationScreen} from './src/screens/DonationScreen';
 import {useDailyStory, useStorySeen} from './src/services/stories';
 import {prefetchImages} from './src/components/RemoteImage';
 
@@ -78,6 +79,43 @@ function App() {
 const VISIBLE = 1;
 const HIDDEN = 0.001;
 const WELCOME_SEEN_KEY = 'welcome_seen_v1';
+// Длительности кроссфейда вкладок/оверлеев — резкая смена экранов «моргала».
+const FADE_IN_MS = 180;
+const FADE_OUT_MS = 150;
+
+/** Слот вкладки с плавным появлением/исчезновением: содержимое остаётся
+ *  смонтированным на время фейд-аута, потом размонтируется (прежняя
+ *  семантика «скрыт — значит размонтирован» сохраняется). */
+function FadeSlot({shown, children}: {shown: boolean; children: React.ReactNode}) {
+  const [mounted, setMounted] = useState(shown);
+  const op = useRef(new Animated.Value(shown ? 1 : 0)).current;
+  useEffect(() => {
+    if (shown) {
+      setMounted(true);
+      Animated.timing(op, {
+        toValue: 1,
+        duration: FADE_IN_MS,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(op, {
+        toValue: 0,
+        duration: FADE_OUT_MS,
+        useNativeDriver: true,
+      }).start(({finished}) => {
+        if (finished) setMounted(false);
+      });
+    }
+  }, [shown, op]);
+  if (!mounted) return null;
+  return (
+    <Animated.View
+      style={[styles.screenSlot, {opacity: op}]}
+      pointerEvents={shown ? 'auto' : 'none'}>
+      {children}
+    </Animated.View>
+  );
+}
 
 function AppContent() {
   const {bottom} = useSafeAreaInsets();
@@ -113,6 +151,10 @@ function AppContent() {
   const [selectedState, setSelectedState] = useState<MindsetState | null>(null);
   const [showSchool, setShowSchool] = useState(false);
   const [showClubMap, setShowClubMap] = useState(false);
+  // Карта клубов тяжёлая (WebView + MapLibre + тайлы). Прогреваем её скрыто,
+  // как только пользователь зашёл на вкладку «Клуб», и не размонтируем после
+  // закрытия — повторные открытия мгновенны.
+  const [mapPreheated, setMapPreheated] = useState(false);
   const [showStories, setShowStories] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   // Quick-category jump from the search screen into a Практики sub-screen.
@@ -142,6 +184,9 @@ function AppContent() {
     AsyncStorage.getItem(WELCOME_SEEN_KEY)
       .then(v => setShowWelcome(v !== '1'))
       .catch(() => setShowWelcome(false));
+    // Восстанавливаем сохранённый оверрайд региона медиа (QA-тумблер) до того,
+    // как экраны начнут резолвить обложки/аудио.
+    initRegionOverride();
   }, []);
 
   // The «Сохранено» toasts open Избранное through this bridge (the player
@@ -162,6 +207,7 @@ function AppContent() {
     const handle = (url: string | null) => {
       const link = url ? parseDeepLink(url) : null;
       if (!link) return;
+      track('deep_link_open', {link_type: link.type, link_id: link.id});
       if (link.type === 'affirmation') {
         // Диплинк ведёт на конкретный экран: закрываем открытые оверлеи —
         // их fixed-заголовки (zIndex 10) иначе всплывают над пейджером
@@ -192,8 +238,13 @@ function AppContent() {
 
     // Ежедневный пуш с аффирмацией: перепланировать на месяц вперёд и
     // обработать тап по уведомлению (data.url — тот же диплинк).
-    ensureDailyAffirmationNotifications();
-    ensurePracticeReminders();
+    // Отложено: перепланирование читает коллекции Firestore и ставит десятки
+    // системных будильников — на старте это конкурировало с отрисовкой
+    // главного экрана и заметно подтормаживало первые секунды.
+    const notifTimer = setTimeout(() => {
+      ensureDailyAffirmationNotifications();
+      ensurePracticeReminders();
+    }, 8000);
     notifee
       .getInitialNotification()
       .then(n => handle((n?.notification.data?.url as string) ?? null))
@@ -204,6 +255,7 @@ function AppContent() {
       }
     });
     return () => {
+      clearTimeout(notifTimer);
       sub.remove();
       unsubNotifee();
     };
@@ -233,8 +285,18 @@ function AppContent() {
       return;
     }
     setSelectedState(null); // leaving a tab dismisses an open state detail
-    opacities.forEach((op, i) => op.setValue(i === index ? VISIBLE : HIDDEN));
+    // Плавный кроссфейд вместо мгновенного переключения — экран «моргал».
+    opacities.forEach((op, i) =>
+      Animated.timing(op, {
+        toValue: i === index ? VISIBLE : HIDDEN,
+        duration: FADE_IN_MS,
+        useNativeDriver: true,
+      }).start(),
+    );
     setActiveTab(index);
+    if (index === 3) setMapPreheated(true);
+    const tabNames = ['home', 'thinking', 'practices', 'club', 'profile'];
+    trackScreen(tabNames[index] ?? `tab_${index}`);
   }
 
   return (
@@ -267,7 +329,12 @@ function AppContent() {
             <AngelHelper onOpenState={setSelectedState} />
           </View>
           <View style={styles.cardSection}>
-            <AffirmationCard onPress={() => setShowAffirmations(true)} />
+            <AffirmationCard
+              onPress={() => {
+                setShowAffirmations(true);
+                trackScreen('affirmations');
+              }}
+            />
           </View>
           <View style={styles.meditationSection}>
             <MeditationBlock />
@@ -276,7 +343,12 @@ function AppContent() {
             <WebinarBlock />
           </View>
           <View style={styles.schoolSection}>
-            <SchoolCard onPress={() => setShowSchool(true)} />
+            <SchoolCard
+              onPress={() => {
+                setShowSchool(true);
+                trackScreen('school');
+              }}
+            />
           </View>
           <View style={styles.clubSection}>
             <ClubSection onPress={() => handleTabPress(3)} />
@@ -308,35 +380,34 @@ function AppContent() {
 
       {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is
           open so its header can't flash over the map during the WebView load. */}
-      {activeTab === 3 && !showClubMap && !linkAffirmation && (
-        <View style={styles.screenSlot}>
-          <ClubScreen
-            onOpenMap={() => setShowClubMap(true)}
-            onClose={() => handleTabPress(0)}
-          />
-        </View>
-      )}
+      <FadeSlot shown={activeTab === 3 && !showClubMap && !linkAffirmation}>
+        <ClubScreen
+          onOpenMap={() => setShowClubMap(true)}
+          onClose={() => handleTabPress(0)}
+        />
+      </FadeSlot>
 
       {/* Profile tab (index 4) — guest and logged-in variants live inside.
           Unmounted while Избранное/Настройки/Auth are open: its fixed header
           has zIndex 10 and would float above the overlay otherwise. */}
-      {activeTab === 4 &&
-        !showFavorites &&
-        !showSettings &&
-        !showDonation &&
-        !showCourses &&
-        !showAuth &&
-        !linkAffirmation && (
-        <View style={styles.screenSlot}>
-          <ProfileScreen
-            onOpenAuth={() => setShowAuth(true)}
-            onOpenFavorites={() => setShowFavorites(true)}
-            onOpenSettings={() => setShowSettings(true)}
-            onOpenDonation={() => setShowDonation(true)}
-            onOpenCourses={() => setShowCourses(true)}
-          />
-        </View>
-      )}
+      <FadeSlot
+        shown={
+          activeTab === 4 &&
+          !showFavorites &&
+          !showSettings &&
+          !showDonation &&
+          !showCourses &&
+          !showAuth &&
+          !linkAffirmation
+        }>
+        <ProfileScreen
+          onOpenAuth={() => setShowAuth(true)}
+          onOpenFavorites={() => setShowFavorites(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenDonation={() => setShowDonation(true)}
+          onOpenCourses={() => setShowCourses(true)}
+        />
+      </FadeSlot>
 
       {/* State detail — a top-level overlay so tapping a state card (from the
           home picker or the Мышление tab) opens it directly, without a tab jump.
@@ -366,9 +437,12 @@ function AppContent() {
       <BottomNavBar activeIndex={activeTab} onTabPress={handleTabPress} />
 
 
-      {/* Full-screen clubs map opens from the Club tab, above the nav bar. */}
-      {showClubMap && (
-        <View style={styles.screenSlot}>
+      {/* Full-screen clubs map opens from the Club tab, above the nav bar.
+          Смонтирована скрыто с момента захода на вкладку «Клуб» (прогрев). */}
+      {(mapPreheated || showClubMap) && (
+        <View
+          style={[styles.screenSlot, !showClubMap && styles.mapHidden]}
+          pointerEvents={showClubMap ? 'auto' : 'none'}>
           <ClubMapScreen onClose={() => setShowClubMap(false)} />
         </View>
       )}
@@ -403,11 +477,15 @@ function AppContent() {
         </View>
       )}
 
-      {/* Донейшн (Правки, Figma 489:11217): нативная форма пожертвования и
-          экран «Спасибо» вместо простой ссылки на сайт. */}
+      {/* Донейшн — сразу страница сайта внутри приложения, без
+          предварительной формы. */}
       {showDonation && (
         <View style={styles.screenSlot}>
-          <DonationScreen onClose={() => setShowDonation(false)} />
+          <WebPageScreen
+            url={uiString('profile_donation_url', 'https://mikhail-ageev.ru/donate')}
+            title={uiString('profile_tab_donation', 'Донейшн')}
+            onBack={() => setShowDonation(false)}
+          />
         </View>
       )}
 
@@ -521,6 +599,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  // Прогретая, но не открытая карта клубов: невидима и не ловит тапы.
+  mapHidden: {
+    opacity: 0,
   },
 });
 

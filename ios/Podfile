@@ -8,6 +8,10 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, '17.0'
 prepare_react_native_project!
 
+# @react-native-firebase: Firebase через CocoaPods, не через SPM — SPM-вариант
+# несовместим со статической линковкой этого проекта (дубли символов).
+$RNFirebaseDisableSPM = true
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
@@ -21,6 +25,15 @@ target 'AgeevApp' do
   # Objective-C зависимостей при статической линковке.
   pod 'GoogleUtilities', :modular_headers => true
   pod 'RecaptchaInterop', :modular_headers => true
+
+  # Firebase Analytics (@react-native-firebase) при статической линковке:
+  # Swift-подам Firebase нужны module maps их Objective-C зависимостей.
+  pod 'FirebaseCore', :modular_headers => true
+  pod 'FirebaseCoreInternal', :modular_headers => true
+  pod 'FirebaseCoreExtension', :modular_headers => true
+  pod 'FirebaseInstallations', :modular_headers => true
+  pod 'GoogleDataTransport', :modular_headers => true
+  pod 'nanopb', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],

@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo, useRef} from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -24,8 +24,8 @@ const HEADER_CONTENT = 56;
 // forced to Russian (name:ru). GeoJSON clustering reproduces the Figma
 // cluster-count pins. Tapping a pin's Telegram/VK link posts the URL back to
 // RN (window.ReactNativeWebView.postMessage) to open natively.
-function buildMapHtml(clubs: Club[], tgLabel: string, vkLabel: string): string {
-  const points = clubs
+function toPoints(clubs: Club[]) {
+  return clubs
     .filter(c => typeof c.latitude === 'number' && typeof c.longitude === 'number')
     .map(c => ({
       id: c.id,
@@ -36,6 +36,10 @@ function buildMapHtml(clubs: Club[], tgLabel: string, vkLabel: string): string {
       lat: c.latitude,
       lng: c.longitude,
     }));
+}
+
+function buildMapHtml(clubs: Club[], tgLabel: string, vkLabel: string): string {
+  const points = toPoints(clubs);
 
   return `<!DOCTYPE html><html><head>
 <meta charset="utf-8"/>
@@ -77,9 +81,21 @@ function buildMapHtml(clubs: Club[], tgLabel: string, vkLabel: string): string {
     });
   }
 
-  var geojson = {type:'FeatureCollection',features:clubs.map(function(c){
-    return {type:'Feature',geometry:{type:'Point',coordinates:[c.lng,c.lat]},properties:{id:c.id}};
-  })};
+  function toGeojson(){
+    return {type:'FeatureCollection',features:clubs.map(function(c){
+      return {type:'Feature',geometry:{type:'Point',coordinates:[c.lng,c.lat]},properties:{id:c.id}};
+    })};
+  }
+
+  // Обновление точек без перезагрузки документа (клубы приходят из RN
+  // после кэша/живого снапшота Firestore).
+  window.__setClubs = function(list){
+    clubs = list || [];
+    byId = {};
+    clubs.forEach(function(c){ byId[c.id] = c; });
+    var src = map.getSource && map.getSource('clubs');
+    if (src) src.setData(toGeojson());
+  };
 
   function popupFor(id, lngLat){
     var c = byId[id]; if(!c) return;
@@ -92,7 +108,7 @@ function buildMapHtml(clubs: Club[], tgLabel: string, vkLabel: string): string {
 
   map.on('load', function(){
     ruLabels();
-    map.addSource('clubs',{type:'geojson',data:geojson,cluster:true,clusterRadius:45,clusterMaxZoom:14});
+    map.addSource('clubs',{type:'geojson',data:toGeojson(),cluster:true,clusterRadius:45,clusterMaxZoom:14});
     map.addLayer({id:'clusters',type:'circle',source:'clubs',filter:['has','point_count'],
       paint:{'circle-color':'#7BC4F3','circle-radius':17,'circle-stroke-width':1.5,'circle-stroke-color':'#fff'}});
     map.addLayer({id:'cluster-count',type:'symbol',source:'clubs',filter:['has','point_count'],
@@ -141,12 +157,33 @@ export function ClubMapScreen({onClose}: Props) {
   const t = useUIStrings();
   const tgLabel = t('clubs_map_telegram_link', 'Перейти в Telegram');
   const vkLabel = t('clubs_map_vk_link', 'Перейти во ВКонтакте');
+  const webRef = useRef<WebView>(null);
 
-  // Rebuild the document only when the club set changes (rare, realtime).
+  // Документ строится один раз (пересборка = полная перезагрузка WebView и
+  // повторная загрузка тайлов). Свежие клубы уезжают в уже открытую карту
+  // через window.__setClubs.
   const html = useMemo(
     () => buildMapHtml(clubs, tgLabel, vkLabel),
-    [clubs, tgLabel, vkLabel],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
+  const clubsRef = useRef(clubs);
+  useEffect(() => {
+    clubsRef.current = clubs;
+    webRef.current?.injectJavaScript(
+      `window.__setClubs && window.__setClubs(${JSON.stringify(
+        toPoints(clubs),
+      )});true;`,
+    );
+  }, [clubs]);
+  // Документ мог строиться до прихода кэша — досылаем актуальный список.
+  function onLoadEnd() {
+    webRef.current?.injectJavaScript(
+      `window.__setClubs && window.__setClubs(${JSON.stringify(
+        toPoints(clubsRef.current),
+      )});true;`,
+    );
+  }
 
   function onMessage(e: WebViewMessageEvent) {
     const url = e.nativeEvent.data;
@@ -157,18 +194,19 @@ export function ClubMapScreen({onClose}: Props) {
 
   return (
     <View style={styles.root}>
-      {clubs.length > 0 && (
-        <WebView
-          originWhitelist={['*']}
-          source={{html}}
-          onMessage={onMessage}
-          style={styles.web}
-          javaScriptEnabled
-          domStorageEnabled
-          startInLoadingState={false}
-          androidLayerType="hardware"
-        />
-      )}
+      <WebView
+        ref={webRef}
+        originWhitelist={['*']}
+        source={{html}}
+        onMessage={onMessage}
+        onLoadEnd={onLoadEnd}
+        style={styles.web}
+        javaScriptEnabled
+        domStorageEnabled
+        startInLoadingState={false}
+        androidLayerType="hardware"
+      />
+
 
       {loading && clubs.length === 0 && (
         <View style={styles.loader}>

@@ -1,6 +1,6 @@
-import React, {useState} from 'react';
+import React, {useCallback, useEffect, useRef} from 'react';
 import {
-  Alert,
+  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,20 +11,9 @@ import {
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK, ICON_TEXT_SIZE} from '../assets/icons';
-import {
-  DeleteAccountModal,
-  SignOutModal,
-} from '../components/AccountModals';
 import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
-import {PrimaryButton} from '../components/PrimaryButton';
 import {ToggleSwitch} from '../components/ToggleSwitch';
-import {
-  authErrorMessage,
-  deleteAccount,
-  signOutUser,
-  useAuth,
-} from '../context/AuthContext';
 import {
   ReminderTime,
   TextSize,
@@ -35,9 +24,16 @@ import {
   ensureDailyAffirmationNotifications,
   ensurePracticeReminders,
 } from '../services/dailyNotifications';
+import {track} from '../services/analytics';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {APP_ENV} from '../config/env';
+import {
+  getRegion,
+  setRegionOverride,
+  subscribeRegion,
+} from '../services/mediaRegion';
 
 const SECTION_MARGIN = 24;
 const BTN_SIZE = 34;
@@ -65,40 +61,33 @@ function Chip({
   );
 }
 
-/** Настройки (Figma 448:10501; выход/удаление — 508:10727). */
+/** Настройки (Figma 448:10501). */
 export function SettingsScreen({onBack}: Props) {
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
   const {settings, updateSettings} = useAppSettings();
-  const {user} = useAuth();
   const t = useUIStrings();
-  const [modal, setModal] = useState<'none' | 'signout' | 'delete'>('none');
-  const [deleting, setDeleting] = useState(false);
 
-  async function handleSignOut() {
-    setModal('none');
-    try {
-      await signOutUser();
-      onBack();
-    } catch (e) {
-      Alert.alert(t('account_error', 'Ошибка'), authErrorMessage(e));
-    }
-  }
+  // Регион медиа (QA-тумблер): перерисовываем экран при смене источника.
+  const [region, setRegion] = React.useState(getRegion());
+  useEffect(() => subscribeRegion(() => setRegion(getRegion())), []);
 
-  async function handleDelete() {
-    if (deleting) return;
-    setDeleting(true);
-    try {
-      await deleteAccount();
-      setModal('none');
-      onBack();
-    } catch (e) {
-      setModal('none');
-      Alert.alert(t('account_error', 'Ошибка'), authErrorMessage(e));
-    } finally {
-      setDeleting(false);
-    }
-  }
+  // Плавное появление/закрытие вместо резкой смены экрана.
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [fade]);
+  const handleBack = useCallback(() => {
+    Animated.timing(fade, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => onBack());
+  }, [fade, onBack]);
 
   const reminderTimes: {key: ReminderTime; label: string}[] = [
     {key: 'morning', label: t('settings_reminder_morning', 'Утро')},
@@ -120,6 +109,7 @@ export function SettingsScreen({onBack}: Props) {
   }
 
   return (
+    <Animated.View style={[styles.fadeRoot, {opacity: fade}]}>
     <GradientBackground>
       <ScrollView
         style={styles.scroll}
@@ -145,6 +135,7 @@ export function SettingsScreen({onBack}: Props) {
                   value={settings.dailyAffirmationEnabled}
                   onChange={v => {
                     updateSettings({dailyAffirmationEnabled: v});
+                    track('daily_affirmation_toggle', {enabled: v});
                     if (v) {
                       ensureDailyAffirmationNotifications();
                     } else {
@@ -161,6 +152,7 @@ export function SettingsScreen({onBack}: Props) {
                   value={settings.remindersEnabled}
                   onChange={v => {
                     updateSettings({remindersEnabled: v});
+                    track('practice_reminders_toggle', {enabled: v});
                     ensurePracticeReminders();
                   }}
                 />
@@ -228,26 +220,31 @@ export function SettingsScreen({onBack}: Props) {
               />
             </View>
           </View>
-        </View>
 
-        {/* Выход и удаление аккаунта (Figma 508:10727) — только для
-            вошедших. */}
-        {!!user && (
-          <View style={styles.accountBlock}>
-            <PrimaryButton
-              title={t('account_signout_title', 'Выйти')}
-              onPress={() => setModal('signout')}
-            />
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setModal('delete')}
-              style={styles.deleteHit}>
-              <Text style={styles.deleteLink}>
-                {t('account_delete_confirm', 'Удалить аккаунт')}
+          {APP_ENV !== 'prod' && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>QA: источник медиа</Text>
+              <View style={styles.chipsRow}>
+                {(
+                  [
+                    ['ru', '🇷🇺 Россия (зеркало)'],
+                    ['world', '🌍 Мир (Firebase)'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Chip
+                    key={value}
+                    label={label}
+                    active={region === value}
+                    onPress={() => setRegionOverride(value)}
+                  />
+                ))}
+              </View>
+              <Text style={styles.envBadge}>
+                {`Окружение: ${APP_ENV.toUpperCase()} · регион: ${region}`}
               </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
       {/* Шапка: назад + заголовок по центру */}
@@ -255,7 +252,7 @@ export function SettingsScreen({onBack}: Props) {
         <View style={styles.header}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={onBack}
+            onPress={handleBack}
             style={styles.backBtn}>
             <SvgXml xml={ICON_BACK} width={24} height={24} />
           </TouchableOpacity>
@@ -265,44 +262,15 @@ export function SettingsScreen({onBack}: Props) {
           <View style={styles.backBtn} />
         </View>
       </FixedHeader>
-
-      {modal === 'signout' && (
-        <SignOutModal
-          onCancel={() => setModal('none')}
-          onSignOut={handleSignOut}
-        />
-      )}
-      {modal === 'delete' && (
-        <DeleteAccountModal
-          onCancel={() => setModal('none')}
-          onDelete={handleDelete}
-          deleting={deleting}
-        />
-      )}
     </GradientBackground>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  fadeRoot: {flex: 1},
   scroll: {flex: 1},
   content: {flexGrow: 1},
-
-  // ── Выход / удаление аккаунта ─────────────────────────────────────────────
-  accountBlock: {
-    marginTop: 'auto',
-    paddingTop: 40,
-    marginHorizontal: SECTION_MARGIN,
-    gap: 16,
-    alignItems: 'stretch',
-  },
-  deleteHit: {
-    alignSelf: 'center',
-    paddingVertical: 4,
-  },
-  deleteLink: {
-    ...typography.body,
-    color: '#FFB4A9',
-  },
 
   // ── Шапка ──────────────────────────────────────────────────────────────────
   header: {
@@ -321,6 +289,13 @@ const styles = StyleSheet.create({
     color: colors.white,
     flex: 1,
     textAlign: 'center',
+  },
+
+  envBadge: {
+    ...typography.caption,
+    color: 'rgba(255,255,255,0.55)',
+    textAlign: 'center',
+    marginTop: 16,
   },
 
   // ── Карточки настроек ─────────────────────────────────────────────────────

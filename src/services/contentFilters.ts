@@ -1,7 +1,8 @@
 import {useEffect, useMemo, useState} from 'react';
-import {collection, onSnapshot} from 'firebase/firestore';
+import {collection, query} from 'firebase/firestore';
 import {db} from '../lib/firebase';
 import {useUIStrings} from './uiStrings';
+import {subscribeCachedQuery} from './contentCache';
 
 // «Короткие» = up to 20 minutes, «Длинные» = everything above.
 const SHORT_MAX_SECONDS = 20 * 60;
@@ -38,16 +39,16 @@ export function useContentFilters<
 
   useEffect(
     () =>
-      onSnapshot(
-        collection(db, 'lifeAreas'),
-        snap => {
+      subscribeCachedQuery<{id: string} & AreaDoc>(
+        'lifeAreas',
+        query(collection(db, 'lifeAreas')),
+        docs => {
           const m: Record<string, AreaDoc> = {};
-          snap.docs.forEach(d => {
-            m[d.id] = d.data() as AreaDoc;
+          docs.forEach(d => {
+            m[d.id] = d;
           });
           setAreas(m);
         },
-        err => console.log('FETCHCHECK lifeAreas ERROR', err.message),
       ),
     [],
   );

@@ -1,7 +1,8 @@
 import {useEffect, useState} from 'react';
-import {collection, onSnapshot, orderBy, query} from 'firebase/firestore';
+import {collection, orderBy, query} from 'firebase/firestore';
 import {db} from '../lib/firebase';
 import {prefetchImages} from '../components/RemoteImage';
+import {subscribeCachedQuery} from './contentCache';
 
 export type LifeArea =
   | 'money'
@@ -44,25 +45,22 @@ export function useMeditations() {
 
   useEffect(() => {
     const q = query(collection(db, 'meditations'), orderBy('sortOrder'));
-    const unsub = onSnapshot(
+    return subscribeCachedQuery<Meditation>(
+      'meditations',
       q,
-      snapshot => {
-        const docs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Meditation[];
-        console.log('FETCHCHECK meditations', docs.length);
+      docs => {
         setMeditations(docs);
         prefetchImages(docs.map(d => d.coverUrl));
         setLoading(false);
+        setError(null);
       },
-      err => {
-        console.log('FETCHCHECK meditations ERROR', err.message);
-        setError(err.message);
+      (message, hasData) => {
+        if (!hasData) {
+          setError(message);
+        }
         setLoading(false);
       },
     );
-    return unsub;
   }, []);
 
   return {meditations, loading, error};

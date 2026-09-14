@@ -1,0 +1,4 @@
+<resources>
+    <!-- QA-флейвор: своё имя на иконке, чтобы не путать с прод-установкой. -->
+    <string name="app_name">Ageev QA</string>
+</resources>

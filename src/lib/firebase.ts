@@ -6,15 +6,7 @@ import {Auth, getAuth, initializeAuth} from 'firebase/auth';
 // типы firebase/auth её не объявляют.
 import {getReactNativePersistence} from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const firebaseConfig = {
-  apiKey: 'AIzaSyCNUmsy_RQklwyvD2MK8GZZpFxPYY8YYI0',
-  authDomain: 'mikhail-app.firebaseapp.com',
-  projectId: 'mikhail-app',
-  storageBucket: 'mikhail-app.firebasestorage.app',
-  messagingSenderId: '188401884866',
-  appId: '1:188401884866:web:f5a5a72d3fc65f785ca55b',
-};
+import {firebaseConfig} from '../config/env';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 

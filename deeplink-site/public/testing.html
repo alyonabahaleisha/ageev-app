@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тестирование приложения — Школа Михаила Агеева</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f6f8fa;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1c2b36;
+    line-height: 1.6;
+    padding: 32px 20px 64px;
+  }
+  .page { max-width: 760px; margin: 0 auto; }
+  header {
+    background: linear-gradient(160deg, #22618D 0%, #347FB3 60%, #165079 100%);
+    color: #fff;
+    border-radius: 18px;
+    padding: 28px 28px 24px;
+    margin-bottom: 28px;
+  }
+  header h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+  header p { opacity: .88; font-size: 14px; }
+  h2 { font-size: 19px; margin: 34px 0 6px; color: #165079; }
+  h2 .num {
+    display: inline-block; width: 28px; height: 28px; line-height: 28px;
+    text-align: center; background: #22618D; color: #fff; border-radius: 50%;
+    font-size: 14px; margin-right: 8px;
+  }
+  p, li { font-size: 15px; margin-bottom: 8px; }
+  ul, ol { padding-left: 24px; margin-bottom: 10px; }
+  .expect {
+    background: #eaf2f8; border-radius: 12px; padding: 12px 16px;
+    font-size: 14px; margin: 10px 0 4px;
+  }
+  .expect b { color: #165079; }
+  .tip { color: #5c6b76; font-size: 13.5px; }
+  a { color: #22618D; }
+
+  /* Форма */
+  .form-card {
+    background: #fff; border: 1px solid #e2e8ee; border-radius: 18px;
+    padding: 24px; margin-top: 40px;
+  }
+  .form-card h2 { margin-top: 0; }
+  label { display: block; font-size: 14px; font-weight: 600; margin: 14px 0 5px; }
+  input, select, textarea {
+    width: 100%; font: inherit; font-size: 15px; color: inherit;
+    border: 1px solid #c9d4dd; border-radius: 10px; padding: 10px 12px;
+    background: #fbfcfd;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  button {
+    margin-top: 18px; width: 100%; font: inherit; font-size: 16px; font-weight: 600;
+    color: #fff; background: #22618D; border: 0; border-radius: 30px;
+    padding: 14px; cursor: pointer;
+  }
+  button:disabled { opacity: .6; }
+  .status { margin-top: 12px; font-size: 14px; text-align: center; }
+  .status.ok { color: #1a7d43; }
+  .status.err { color: #b3261e; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <h1>Тестирование приложения</h1>
+    <p>«Школа Михаила Агеева» · спасибо, что помогаете сделать приложение лучше!
+    Пройдите сценарии ниже — в любом порядке — и присылайте всё, что покажется
+    неправильным или неудобным, через форму в конце страницы.</p>
+  </header>
+
+  <p class="tip">Замечания шлите сразу, как заметили, — не копите на потом.
+  Одна проблема = одна отправка формы. «Мелочей» не бывает: опечатка, странный
+  отступ, непонятная формулировка — всё ценно.</p>
+
+  <h2><span class="num">1</span>Установка и первый запуск</h2>
+  <ol>
+    <li>Установите приложение и откройте его впервые.</li>
+    <li>Пройдите приветственный экран.</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> приложение открывается без ошибок,
+  тексты читаются, ничего не обрезано; после приветствия попадаете на главный
+  экран.</div>
+
+  <h2><span class="num">2</span>Регистрация и вход</h2>
+  <ol>
+    <li>Зарегистрируйтесь по email и паролю (Профиль → Войти).</li>
+    <li>Выйдите и войдите снова этим же способом.</li>
+    <li>Попробуйте «Забыли пароль?» — письмо должно прийти на почту.</li>
+    <li>Выйдите и войдите через Google-аккаунт.</li>
+    <li>На iPhone — также попробуйте «Вход через Apple».</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> после входа на главной появляется
+  приветствие с вашим именем; повторный вход проходит без ошибок; при
+  перезапуске приложения вы остаётесь в аккаунте.</div>
+
+  <h2><span class="num">3</span>Главный экран</h2>
+  <ol>
+    <li>Полистайте сторис вверху (тапы вперёд/назад, свайп).</li>
+    <li>Посмотрите «аффирмацию дня», откройте её.</li>
+    <li>Пролистайте главную до конца: медитации, вебинары, карточка школы.</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> картинки загружаются, скролл плавный,
+  все карточки открываются.</div>
+
+  <h2><span class="num">4</span>Плеер и практики</h2>
+  <ol>
+    <li>Запустите любую медитацию. Поставьте на паузу, перемотайте, продолжите.</li>
+    <li>Заблокируйте экран телефона — звук должен продолжаться; управление
+    с экрана блокировки должно работать.</li>
+    <li>Сверните плеер (свайп/крестик) — внизу появится мини-плеер
+    «Продолжить практику».</li>
+    <li>Дослушайте трек до конца (можно перемотать почти в конец).</li>
+    <li>Выйдите из приложения на середине трека, откройте снова и запустите
+    тот же трек.</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> после завершения появляется экран
+  «Как вы себя чувствуете?»; после перезапуска трек продолжается с места
+  остановки; звук в фоне не прерывается.</div>
+
+  <h2><span class="num">5</span>Аффирмации и избранное</h2>
+  <ol>
+    <li>Откройте раздел аффирмаций с главной, полистайте карточки.</li>
+    <li>Отметьте несколько аффирмаций и медитаций сердечком.</li>
+    <li>Поделитесь аффирмацией (кнопка «поделиться») — отправьте себе
+    в мессенджер и откройте полученную ссылку.</li>
+    <li>Зайдите в Профиль → Избранное: проверьте список, уберите что-нибудь
+    из избранного.</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> сердечки сохраняются после перезапуска;
+  ссылка из мессенджера открывает приложение на нужной карточке.</div>
+
+  <h2><span class="num">6</span>Вкладка «Мышление»</h2>
+  <ol>
+    <li>Откройте вкладку «Мышление», выберите любое состояние.</li>
+    <li>Пройдите шаги внутри состояния, включите аудио, если есть.</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> контент открывается, прогресс
+  сохраняется, «назад» возвращает куда ожидали.</div>
+
+  <h2><span class="num">7</span>Клуб и карта</h2>
+  <ol>
+    <li>Откройте вкладку «Клуб», полистайте список городов.</li>
+    <li>Найдите город через поиск.</li>
+    <li>Откройте карту: подвигайте, поприближайте, тапните по кластеру
+    (кружок с числом) и по отдельной точке.</li>
+    <li>Из попапа города перейдите в Telegram-канал клуба.</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> карта открывается быстро, точки видны
+  по всему миру, ссылки открываются в Telegram/VK.</div>
+
+  <h2><span class="num">8</span>Профиль и настройки</h2>
+  <ol>
+    <li>Измените имя в «Изменить профиль», проверьте, что приветствие
+    на главной обновилось.</li>
+    <li>В Настройках включите «Аффирмация дня в 9:00» и напоминания
+    о практике (утро/день/вечер). Разрешите уведомления, если спросит.</li>
+    <li>На следующий день проверьте, пришли ли уведомления
+    (телефон может лежать заблокированным).</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> уведомления приходят в назначенное
+  время; тап по уведомлению открывает приложение на нужном экране.</div>
+
+  <h2><span class="num">9</span>Без интернета</h2>
+  <ol>
+    <li>Включите авиарежим и откройте приложение.</li>
+    <li>Попробуйте открыть уже прослушанную ранее медитацию.</li>
+    <li>Выключите авиарежим — приложение должно «ожить» без перезапуска.</li>
+  </ol>
+  <div class="expect"><b>Ожидается:</b> приложение не падает; ранее
+  прослушанное аудио играет из кэша; после появления сети контент
+  подгружается.</div>
+
+  <h2><span class="num">10</span>Общее впечатление</h2>
+  <ul>
+    <li>Плавно ли работают переходы между вкладками и экранами?</li>
+    <li>Всё ли понятно без объяснений? Где «затупили» — так и напишите.</li>
+    <li>Опечатки, странные формулировки, обрезанные тексты.</li>
+    <li>Удаление аккаунта проверять не нужно (если очень хочется — заведите
+    для этого отдельный тестовый аккаунт).</li>
+  </ul>
+
+  <div class="form-card" id="feedback">
+    <h2>Форма фидбека</h2>
+    <p class="tip">Одна проблема — одна отправка. Чем точнее шаги, тем быстрее
+    починим.</p>
+    <form id="fb-form">
+      <label for="fb-name">Ваше имя</label>
+      <input id="fb-name" type="text" placeholder="Как к вам обращаться" required>
+
+      <label for="fb-device">Телефон и система</label>
+      <input id="fb-device" type="text" placeholder="Например: iPhone 13, iOS 18 / Samsung A54, Android 14" required>
+
+      <label for="fb-area">Раздел приложения</label>
+      <select id="fb-area">
+        <option>Установка / первый запуск</option>
+        <option>Регистрация / вход</option>
+        <option>Главный экран</option>
+        <option>Плеер / практики</option>
+        <option>Аффирмации / избранное</option>
+        <option>Мышление</option>
+        <option>Клуб / карта</option>
+        <option>Профиль / настройки</option>
+        <option>Уведомления</option>
+        <option>Другое</option>
+      </select>
+
+      <label for="fb-severity">Насколько мешает</label>
+      <select id="fb-severity">
+        <option>Блокирует — пользоваться невозможно</option>
+        <option>Серьёзно — но можно обойти</option>
+        <option>Мелочь / косметика</option>
+        <option>Это не ошибка, а предложение</option>
+      </select>
+
+      <label for="fb-text">Что случилось</label>
+      <textarea id="fb-text" placeholder="Что делали, что ожидали, что произошло на самом деле" required></textarea>
+
+      <button type="submit" id="fb-btn">Отправить</button>
+      <div class="status" id="fb-status"></div>
+    </form>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+  firebase.initializeApp({
+    apiKey: 'AIzaSyCNUmsy_RQklwyvD2MK8GZZpFxPYY8YYI0',
+    authDomain: 'mikhail-app.firebaseapp.com',
+    projectId: 'mikhail-app',
+  });
+  var db = firebase.firestore();
+  var form = document.getElementById('fb-form');
+  var btn = document.getElementById('fb-btn');
+  var status = document.getElementById('fb-status');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    btn.disabled = true;
+    status.className = 'status';
+    status.textContent = 'Отправляем…';
+    db.collection('feedback').add({
+      name: document.getElementById('fb-name').value.trim(),
+      device: document.getElementById('fb-device').value.trim(),
+      area: document.getElementById('fb-area').value,
+      severity: document.getElementById('fb-severity').value,
+      text: document.getElementById('fb-text').value.trim(),
+      userAgent: navigator.userAgent,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }).then(function () {
+      status.className = 'status ok';
+      status.textContent = 'Спасибо! Фидбек отправлен ✅ Можно прислать ещё.';
+      document.getElementById('fb-text').value = '';
+      btn.disabled = false;
+    }).catch(function (err) {
+      status.className = 'status err';
+      status.textContent = 'Не отправилось: ' + err.message +
+        '. Продублируйте, пожалуйста, на ageev.school@gmail.com';
+      btn.disabled = false;
+    });
+  });
+</script>
+</body>
+</html>

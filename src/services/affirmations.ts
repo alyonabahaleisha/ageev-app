@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
-import {collection, onSnapshot} from 'firebase/firestore';
+import {collection, query} from 'firebase/firestore';
 import {db} from '../lib/firebase';
+import {subscribeCachedQuery} from './contentCache';
 
 // In Firestore, each document in `affirmations` is a category: the doc id is
 // the category key (same keys as meditation LifeArea) and the only field is
@@ -74,11 +75,18 @@ export function buildAffirmationList(
 export function affirmationDocsToByKey(
   docs: {id: string; data: () => unknown}[],
 ): Record<string, string[]> {
+  return affirmationRawToByKey(
+    docs.map(d => ({id: d.id, ...(d.data() as object)})),
+  );
+}
+
+export function affirmationRawToByKey(
+  docs: {id: string; texts?: unknown}[],
+): Record<string, string[]> {
   const byKey: Record<string, string[]> = {};
   docs.forEach(d => {
-    const texts = (d.data() as {texts?: unknown}).texts;
-    if (Array.isArray(texts)) {
-      byKey[d.id] = texts.filter(
+    if (Array.isArray(d.texts)) {
+      byKey[d.id] = d.texts.filter(
         (t): t is string => typeof t === 'string' && t.trim().length > 0,
       );
     }
@@ -106,35 +114,36 @@ export function useAffirmations() {
   // «Сферы жизни» сразу отражались на чипах категорий.
   useEffect(
     () =>
-      onSnapshot(
-        collection(db, 'lifeAreas'),
-        snap => {
+      subscribeCachedQuery<{id: string} & AreaDoc>(
+        'lifeAreas',
+        query(collection(db, 'lifeAreas')),
+        docs => {
           const m: Record<string, AreaDoc> = {};
-          snap.docs.forEach(d => {
-            m[d.id] = d.data() as AreaDoc;
+          docs.forEach(d => {
+            m[d.id] = d;
           });
           setAreas(m);
         },
-        () => {},
       ),
     [],
   );
 
   useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, 'affirmations'),
-      snapshot => {
-        setAffirmations(
-          buildAffirmationList(affirmationDocsToByKey(snapshot.docs), areas),
-        );
+    return subscribeCachedQuery<{id: string} & Record<string, unknown>>(
+      'affirmations',
+      query(collection(db, 'affirmations')),
+      docs => {
+        setAffirmations(buildAffirmationList(affirmationRawToByKey(docs), areas));
         setLoading(false);
+        setError(null);
       },
-      err => {
-        setError(err.message);
+      (message, hasData) => {
+        if (!hasData) {
+          setError(message);
+        }
         setLoading(false);
       },
     );
-    return unsub;
   }, [areas]);
 
   return {affirmations, loading, error};

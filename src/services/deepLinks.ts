@@ -3,9 +3,11 @@ import {db} from '../lib/firebase';
 import {PlayerTrack} from '../context/PlayerContext';
 import {uiString} from './uiStrings';
 
-// Диплинки на контент: https://mikhail-app.web.app/l/<type>/<id> (universal
-// link + страница-редирект для тех, у кого нет приложения) и ageev://<type>/<id>
+// Диплинки на контент: https://app.agvclub.ru/l/<type>/<id> (universal link +
+// страница-редирект для тех, у кого нет приложения) и ageev://<type>/<id>
 // (кастомная схема — на неё редиректит страница). Оба формата парсятся здесь.
+// Старый домен mikhail-app.web.app оставлен в парсере и iOS-entitlements для
+// уже разосланных ссылок, но заблокирован в РФ — новые ссылки идут на agvclub.
 
 export type DeepLinkType =
   | 'affirmation'
@@ -29,7 +31,7 @@ export function parseDeepLink(url: string): DeepLink | null {
 }
 
 export function buildShareLink(type: DeepLinkType, id: string): string {
-  const base = uiString('share_link_base', 'https://mikhail-app.web.app/l');
+  const base = uiString('share_link_base', 'https://app.agvclub.ru/l');
   return `${base}/${type}/${encodeURIComponent(id)}`;
 }
 

@@ -8,6 +8,7 @@ import {
   UserCredential,
 } from 'firebase/auth';
 import {auth} from '../lib/firebase';
+import {track} from './analytics';
 
 // Вход через Google и Apple → Firebase Auth (signInWithCredential).
 // OAuth-клиенты проекта mikhail-app создаются Firebase автоматически при
@@ -38,7 +39,12 @@ export async function signInWithGoogle(): Promise<UserCredential | null> {
   if (!idToken) {
     throw new Error('Google sign-in returned no idToken');
   }
-  return signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+  const cred = await signInWithCredential(
+    auth,
+    GoogleAuthProvider.credential(idToken),
+  );
+  track('login', {method: 'google'});
+  return cred;
 }
 
 /** Вход через Apple доступен только на iOS 13+. */
@@ -62,7 +68,9 @@ export async function signInWithApple(): Promise<UserCredential | null> {
       idToken: response.identityToken,
       rawNonce: response.nonce,
     });
-    return await signInWithCredential(auth, credential);
+    const cred = await signInWithCredential(auth, credential);
+    track('login', {method: 'apple'});
+    return cred;
   } catch (e) {
     // 1001 = ASAuthorizationError.canceled
     if ((e as {code?: string})?.code === appleAuth.Error.CANCELED) {

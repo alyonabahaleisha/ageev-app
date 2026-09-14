@@ -1,5 +1,6 @@
 import React from 'react';
 import FastImage, {FastImageProps, Source} from '@d11/react-native-fast-image';
+import {resolveMediaUrl} from '../services/mediaRegion';
 
 /**
  * Thin wrapper over FastImage for remote cover art.
@@ -19,6 +20,7 @@ export function RemoteImage(props: FastImageProps) {
         cache: FastImage.cacheControl.immutable,
         priority: FastImage.priority.normal,
         ...source,
+        uri: resolveMediaUrl(source?.uri) ?? source?.uri,
       }}
     />
   );
@@ -34,7 +36,10 @@ export function RemoteImage(props: FastImageProps) {
 export function prefetchImages(urls: (string | null | undefined)[]) {
   const sources = urls
     .filter((u): u is string => !!u)
-    .map(uri => ({uri, cache: FastImage.cacheControl.immutable}));
+    .map(u => ({
+      uri: resolveMediaUrl(u) ?? u,
+      cache: FastImage.cacheControl.immutable,
+    }));
   if (!sources.length || typeof FastImage?.preload !== 'function') {
     return;
   }

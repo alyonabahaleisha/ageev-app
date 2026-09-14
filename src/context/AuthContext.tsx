@@ -17,6 +17,7 @@ import {
   User,
 } from 'firebase/auth';
 import {auth} from '../lib/firebase';
+import {track, trackUser} from '../services/analytics';
 
 type AuthContextValue = {
   user: User | null;
@@ -36,6 +37,7 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
     return onAuthStateChanged(auth, u => {
       setUser(u);
       setInitializing(false);
+      trackUser(u?.uid ?? null);
     });
   }, []);
 
@@ -77,7 +79,10 @@ export function authErrorMessage(err: unknown): string {
 }
 
 export function signIn(email: string, password: string) {
-  return signInWithEmailAndPassword(auth, email.trim(), password);
+  return signInWithEmailAndPassword(auth, email.trim(), password).then(cred => {
+    track('login', {method: 'email'});
+    return cred;
+  });
 }
 
 export async function signUp(
@@ -95,6 +100,7 @@ export async function signUp(
   if (displayName?.trim()) {
     await updateProfile(cred.user, {displayName: displayName.trim()});
   }
+  track('sign_up', {method: 'email'});
   return cred;
 }
 
@@ -125,5 +131,6 @@ export function deleteAccount() {
   if (!user) {
     return Promise.resolve();
   }
+  track('account_delete');
   return deleteUser(user);
 }

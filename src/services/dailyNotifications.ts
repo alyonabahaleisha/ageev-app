@@ -1,7 +1,9 @@
 import {Platform} from 'react-native';
 import notifee, {
+  AlarmType,
   AndroidImportance,
   AuthorizationStatus,
+  RepeatFrequency,
   TimestampTrigger,
   TriggerType,
 } from '@notifee/react-native';
@@ -24,6 +26,26 @@ import {uiString} from './uiStrings';
 const ID_PREFIX = 'daily-aff-';
 const DAYS_AHEAD = 30;
 const FIRE_HOUR = 9;
+
+/**
+ * Триггер на конкретное время. На Android — через AlarmManager
+ * (SET_AND_ALLOW_WHILE_IDLE): дефолтный WorkManager система откладывает в
+ * Doze и на агрессивных прошивках (Xiaomi/Samsung) может вообще не запустить,
+ * из-за чего уведомления «не приходили». Неточный alarm не требует разрешения
+ * SCHEDULE_EXACT_ALARM и срабатывает даже в режиме сна с точностью до минут —
+ * для ежедневных напоминаний достаточно.
+ */
+function timestampTrigger(d: Date, repeat?: RepeatFrequency): TimestampTrigger {
+  return {
+    type: TriggerType.TIMESTAMP,
+    timestamp: d.getTime(),
+    repeatFrequency: repeat,
+    alarmManager:
+      Platform.OS === 'android'
+        ? {type: AlarmType.SET_AND_ALLOW_WHILE_IDLE}
+        : undefined,
+  };
+}
 
 function dateKey(d: Date): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
@@ -139,10 +161,6 @@ export async function ensureDailyAffirmationNotifications(): Promise<void> {
       }
       if (!body) continue;
 
-      const trigger: TimestampTrigger = {
-        type: TriggerType.TIMESTAMP,
-        timestamp: d.getTime(),
-      };
       await notifee.createTriggerNotification(
         {
           id: ID_PREFIX + key,
@@ -154,7 +172,7 @@ export async function ensureDailyAffirmationNotifications(): Promise<void> {
             ? {channelId, pressAction: {id: 'default'}}
             : undefined,
         },
-        trigger,
+        timestampTrigger(d),
       );
     }
   } catch (e) {
@@ -218,35 +236,32 @@ export async function ensurePracticeReminders(): Promise<void> {
       'notif_practice_body',
       'Уделите несколько минут себе — выберите практику на сегодня',
     );
+    // Текст один и тот же каждый день, поэтому вместо месяца отдельных
+    // будильников (до 93 штук — тормозило старт приложения) — по одному
+    // ежедневно повторяющемуся триггеру на каждый выбранный слот.
     const now = new Date();
-    for (let i = 0; i <= DAYS_AHEAD; i++) {
-      for (const time of appSettings.reminderTimes) {
-        const d = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate() + i,
-          PRACTICE_HOURS[time],
-          0,
-          0,
-        );
-        if (d.getTime() <= Date.now()) continue;
-        const trigger: TimestampTrigger = {
-          type: TriggerType.TIMESTAMP,
-          timestamp: d.getTime(),
-        };
-        await notifee.createTriggerNotification(
-          {
-            id: `${PRACTICE_PREFIX}${dateKey(d)}-${time}`,
-            title,
-            body,
-            ios: {sound: 'default'},
-            android: channelId
-              ? {channelId, pressAction: {id: 'default'}}
-              : undefined,
-          },
-          trigger,
-        );
-      }
+    for (const time of appSettings.reminderTimes) {
+      const d = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        PRACTICE_HOURS[time],
+        0,
+        0,
+      );
+      if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+      await notifee.createTriggerNotification(
+        {
+          id: PRACTICE_PREFIX + time,
+          title,
+          body,
+          ios: {sound: 'default'},
+          android: channelId
+            ? {channelId, pressAction: {id: 'default'}}
+            : undefined,
+        },
+        timestampTrigger(d, RepeatFrequency.DAILY),
+      );
     }
   } catch (e) {
     console.log('FETCHCHECK practice reminders ERROR', (e as Error)?.message);

@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
-import {doc, onSnapshot} from 'firebase/firestore';
+import {doc} from 'firebase/firestore';
 import {db} from '../lib/firebase';
+import {subscribeCachedDoc} from './contentCache';
 
 // Live copy of the CMS-editable UI texts (config/ui_strings in Firestore,
 // edited on the admin "UI тексты" page). Keys missing from the doc fall back
@@ -14,14 +15,12 @@ function ensureStarted() {
     return;
   }
   started = true;
-  onSnapshot(
+  subscribeCachedDoc<Record<string, string>>(
+    'ui_strings',
     doc(db, 'config', 'ui_strings'),
-    snap => {
-      strings = (snap.data() as Record<string, string>) || {};
+    data => {
+      strings = data || {};
       listeners.forEach(l => l());
-    },
-    err => {
-      console.log('FETCHCHECK ui_strings ERROR', err.message);
     },
   );
 }

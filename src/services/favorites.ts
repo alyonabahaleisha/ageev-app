@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {onAuthStateChanged} from 'firebase/auth';
 import {auth} from '../lib/firebase';
+import {track} from './analytics';
 
 // Избранное (Figma 448:10703): медитации, вебинары, духовные завтраки и
 // аффирмации, которые пользователь отметил сердечком. Хранится локально,
@@ -79,8 +80,10 @@ export function isFavorite(kind: FavoriteKind, id: string): boolean {
 export function toggleFavorite(item: Omit<FavoriteItem, 'addedAt'>) {
   if (isFavorite(item.kind, item.id)) {
     items = items.filter(i => !(i.kind === item.kind && i.id === item.id));
+    track('favorite_remove', {content_kind: item.kind, content_id: item.id});
   } else {
     items = [{...item, addedAt: Date.now()}, ...items];
+    track('favorite_add', {content_kind: item.kind, content_id: item.id});
   }
   AsyncStorage.setItem(KEY_PREFIX + scope, JSON.stringify(items)).catch(
     () => {},

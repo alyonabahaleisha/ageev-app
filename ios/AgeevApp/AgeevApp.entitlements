@@ -8,6 +8,7 @@
 	</array>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:app.agvclub.ru</string>
 		<string>applinks:mikhail-app.web.app</string>
 	</array>
 </dict>
