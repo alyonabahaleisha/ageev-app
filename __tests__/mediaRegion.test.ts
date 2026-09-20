@@ -5,6 +5,8 @@
 const FIREBASE_URL =
   'https://firebasestorage.googleapis.com/v0/b/mikhail-app.firebasestorage.app/o/audio%2Fmeditations%2Fx%20y.mp3?alt=media&token=abc';
 const MIRROR_URL = 'https://storage.yandexcloud.net/ageev-app-test/audio/meditations/x%20y.mp3';
+const WORLD_URL =
+  'https://pub-e856cc4814a440d5b979a3c8e44cf0c4.r2.dev/audio/meditations/x%20y.mp3';
 
 function withRegion(region: string, fn: (resolve: (u?: string | null) => string | undefined) => void) {
   jest.isolateModules(() => {
@@ -24,9 +26,9 @@ describe('resolveMediaUrl', () => {
     });
   });
 
-  it('leaves Firebase URLs untouched when region=world', () => {
+  it('rewrites Firebase URLs to the R2 world mirror when region=world', () => {
     withRegion('world', resolve => {
-      expect(resolve(FIREBASE_URL)).toBe(FIREBASE_URL);
+      expect(resolve(FIREBASE_URL)).toBe(WORLD_URL);
     });
   });
 

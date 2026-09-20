@@ -3,18 +3,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from 'react-native-config';
 
 // Регион пользователя определяет, откуда грузить медиа:
-//  - 'ru'    → зеркало на РФ-сервере (Google может быть заблокирован);
-//  - 'world' → напрямую Firebase Storage (для мира быстрее, ~как сейчас).
-// Данные в Firestore хранят Firebase-URL как есть; клиент переписывает хост
-// на лету, поэтому переезд не требует правки контента и обратим.
+//  - 'ru'    → зеркало Yandex Object Storage (РФ; Google может быть заблокирован);
+//  - 'world' → зеркало Cloudflare R2 (глобальный CDN + бесплатный egress).
+// Firebase Storage остаётся только origin'ом (загрузка из CMS) и источником
+// синка. Данные в Firestore хранят Firebase-URL как есть; клиент переписывает
+// хост на лету, поэтому переезд не требует правки контента и обратим.
 
 export type Region = 'ru' | 'world';
 
-// База РФ-зеркала: Yandex Object Storage (ru-central1), публичный бакет.
-// Пути внутри совпадают с путями в Firebase-бакете. Раздаёт с range-запросами
-// (стриминг аудио) и годовым кэшем. При добавлении CDN/домена — менять только
-// эту строку. Старый VPS app.agvclub.ru/media отключён (душил 443 под нагрузкой).
+// Базы зеркал. Пути внутри совпадают с путями в Firebase-бакете. Обе раздают с
+// range-запросами (стриминг) и годовым кэшем. Замена CDN/домена — только здесь.
 const RU_MEDIA_BASE = 'https://storage.yandexcloud.net/ageev-app-test/';
+const WORLD_MEDIA_BASE =
+  'https://pub-e856cc4814a440d5b979a3c8e44cf0c4.r2.dev/';
 
 function deviceCountry(): string {
   try {
@@ -98,19 +99,15 @@ function storagePath(url: string): string | null {
 }
 
 /**
- * Приводит медиа-URL к источнику текущего региона.
- * Для 'world' и для нефайрбейзных ссылок — возвращает как есть.
- * Для 'ru' — переписывает Firebase-URL на РФ-зеркало (по пути объекта).
- * Уже переписанные (app.agvclub.ru) и локальные (file://) ссылки не трогает.
+ * Приводит медиа-URL к зеркалу текущего региона (РФ → Yandex, мир → R2),
+ * переписывая Firebase-URL по пути объекта. Не-Firebase, уже переписанные и
+ * локальные (file://) ссылки возвращает как есть.
  */
 export function resolveMediaUrl(
   url: string | null | undefined,
 ): string | undefined {
   if (!url) {
     return undefined;
-  }
-  if (getRegion() !== 'ru') {
-    return url;
   }
   if (!url.includes('firebasestorage') || !url.includes('/o/')) {
     return url;
@@ -119,5 +116,6 @@ export function resolveMediaUrl(
   if (!path) {
     return url;
   }
-  return RU_MEDIA_BASE + path.split('/').map(encodeURIComponent).join('/');
+  const base = getRegion() === 'ru' ? RU_MEDIA_BASE : WORLD_MEDIA_BASE;
+  return base + path.split('/').map(encodeURIComponent).join('/');
 }

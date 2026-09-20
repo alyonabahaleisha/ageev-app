@@ -14,15 +14,29 @@ const AUDIO_DIR = `${CachesDirectoryPath}/audio`;
 
 const inFlight = new Set<string>();
 
-function localPath(id: string): string {
-  // Track ids are Firestore doc ids (URL-safe), so they're safe as filenames.
-  return `${AUDIO_DIR}/${id}.mp3`;
+// iOS выбирает аудио-декодер по расширению локального файла, поэтому кэш обязан
+// сохранять настоящий контейнер: m4a как .m4a, mp3 как .mp3. Иначе m4a-файл,
+// сохранённый как .mp3, не декодируется при повторном воспроизведении (медитации
+// и вебинары молчат, а завтраки-mp3 играют).
+function extFromUrl(url: string): string {
+  const m = url.split('?')[0].toLowerCase().match(/\.(m4a|mp3|aac|wav)$/);
+  return m ? `.${m[1]}` : '.mp3';
 }
 
-/** file:// URL for a cached track, or null if it isn't downloaded yet. */
-export async function getCachedAudioUrl(id: string): Promise<string | null> {
+function localPath(id: string, url: string): string {
+  // Track ids are Firestore doc ids (URL-safe), so they're safe as filenames.
+  return `${AUDIO_DIR}/${id}${extFromUrl(url)}`;
+}
+
+/** file:// URL for a cached track, or null if it isn't downloaded yet.
+ *  `url` — исходная ссылка (для выбора правильного расширения кэш-файла). */
+export async function getCachedAudioUrl(
+  id: string,
+  url: string,
+): Promise<string | null> {
   try {
-    return (await exists(localPath(id))) ? `file://${localPath(id)}` : null;
+    const path = localPath(id, url);
+    return (await exists(path)) ? `file://${path}` : null;
   } catch {
     return null;
   }
@@ -36,20 +50,25 @@ export async function getCachedAudioUrl(id: string): Promise<string | null> {
 export async function downloadAudio(id: string, url: string): Promise<void> {
   if (inFlight.has(id)) return;
   inFlight.add(id);
-  const tmp = `${localPath(id)}.part`;
+  const dest = localPath(id, url);
+  const tmp = `${dest}.part`;
   try {
     await mkdir(AUDIO_DIR);
-    if (await exists(localPath(id))) return;
+    if (await exists(dest)) return;
+    // background:false — обычная (не отложенная) загрузка. iOS откладывает
+    // background-загрузки на своё усмотрение, из-за чего кэш не успевал
+    // записаться и повторное воспроизведение снова стримило файл. Во время
+    // проигрывания аудио процесс не засыпает (audio background mode), поэтому
+    // обычная загрузка спокойно докачивается и с заблокированным экраном.
     const {statusCode} = await downloadFile({
       fromUrl: url,
       toFile: tmp,
-      background: true,
-      discretionary: false,
+      background: false,
     }).promise;
     if (statusCode && statusCode >= 400) {
       throw new Error(`HTTP ${statusCode}`);
     }
-    await moveFile(tmp, localPath(id));
+    await moveFile(tmp, dest);
   } catch (e) {
     await unlink(tmp).catch(() => {});
     console.warn('[AudioCache] download failed:', e);

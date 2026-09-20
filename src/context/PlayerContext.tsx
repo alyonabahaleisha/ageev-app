@@ -126,8 +126,8 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
       // Play the cached file when we have one; otherwise stream and download
       // a local copy in the background for next time. Медиа-URL приводим к
       // источнику региона (РФ-зеркало / Firebase) перед стримом и загрузкой.
-      const cachedUrl = await getCachedAudioUrl(t.id);
       const streamUrl = resolveMediaUrl(t.audioUrl) ?? t.audioUrl;
+      const cachedUrl = await getCachedAudioUrl(t.id, streamUrl);
 
       await TrackPlayer.reset();
       await TrackPlayer.add({
