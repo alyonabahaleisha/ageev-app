@@ -21,6 +21,7 @@ import {
   authErrorMessage,
   deleteAccount,
   resetPassword,
+  signOutUser,
   updateAccountProfile,
   useAuth,
 } from '../context/AuthContext';
@@ -84,6 +85,12 @@ export function EditProfileScreen({onClose}: Props) {
     } finally {
       setDeleting(false);
     }
+  }
+
+  function handleLogout() {
+    // signOut → onAuthStateChanged в App.tsx покажет экран входа; этот экран
+    // размонтируется сам.
+    signOutUser().catch(() => {});
   }
 
   return (
@@ -182,6 +189,15 @@ export function EditProfileScreen({onClose}: Props) {
               onPress={handleSave}
               style={styles.saveBtn}
             />
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleLogout}
+              style={styles.linkHit}>
+              <Text style={styles.link}>
+                {t('account_logout', 'Выйти из аккаунта')}
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.8}

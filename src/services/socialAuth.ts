@@ -2,8 +2,10 @@ import {Platform} from 'react-native';
 import {GoogleSignin} from '@react-native-google-signin/google-signin';
 import {appleAuth} from '@invertase/react-native-apple-authentication';
 import {
+  AuthCredential,
   GoogleAuthProvider,
   OAuthProvider,
+  reauthenticateWithCredential,
   signInWithCredential,
   UserCredential,
 } from 'firebase/auth';
@@ -45,6 +47,59 @@ export async function signInWithGoogle(): Promise<UserCredential | null> {
   );
   track('login', {method: 'google'});
   return cred;
+}
+
+/** Свежий Google-credential (без входа в Firebase) — для реавторизации. */
+async function freshGoogleCredential(): Promise<AuthCredential> {
+  if (Platform.OS === 'android') {
+    await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
+  }
+  const result = await GoogleSignin.signIn();
+  const idToken = result.data?.idToken;
+  if (!idToken) {
+    throw new Error('Google reauth returned no idToken');
+  }
+  return GoogleAuthProvider.credential(idToken);
+}
+
+/** Свежий Apple-credential — для реавторизации. */
+async function freshAppleCredential(): Promise<AuthCredential> {
+  const response = await appleAuth.performRequest({
+    requestedOperation: appleAuth.Operation.LOGIN,
+    requestedScopes: [appleAuth.Scope.EMAIL],
+  });
+  if (!response.identityToken) {
+    throw new Error('Apple reauth returned no identityToken');
+  }
+  return new OAuthProvider('apple.com').credential({
+    idToken: response.identityToken,
+    rawNonce: response.nonce,
+  });
+}
+
+/**
+ * Повторная авторизация текущего пользователя его же провайдером. Нужна для
+ * «чувствительных» операций (удаление аккаунта), где Firebase требует свежий
+ * вход и иначе кидает auth/requires-recent-login. Для email/пароля повторный
+ * вход внутри приложения без пароля невозможен — пробрасываем ошибку выше,
+ * чтобы UI показал понятное сообщение.
+ */
+export async function reauthenticateCurrentUser(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) {
+    return;
+  }
+  const providerId = user.providerData[0]?.providerId;
+  let credential: AuthCredential;
+  if (providerId === 'google.com') {
+    credential = await freshGoogleCredential();
+  } else if (providerId === 'apple.com') {
+    credential = await freshAppleCredential();
+  } else {
+    // password — тут нужен пароль, которого у нас нет.
+    throw {code: 'auth/requires-recent-login'};
+  }
+  await reauthenticateWithCredential(user, credential);
 }
 
 /** Вход через Apple доступен только на iOS 13+. */

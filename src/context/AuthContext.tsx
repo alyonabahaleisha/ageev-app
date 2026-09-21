@@ -18,6 +18,7 @@ import {
 } from 'firebase/auth';
 import {auth} from '../lib/firebase';
 import {track, trackUser} from '../services/analytics';
+import {reauthenticateCurrentUser} from '../services/socialAuth';
 
 type AuthContextValue = {
   user: User | null;
@@ -126,11 +127,25 @@ export async function updateAccountProfile(name: string, email: string) {
   }
 }
 
-export function deleteAccount() {
+export async function deleteAccount() {
   const user = auth.currentUser;
   if (!user) {
-    return Promise.resolve();
+    return;
   }
   track('account_delete');
-  return deleteUser(user);
+  try {
+    await deleteUser(user);
+  } catch (e) {
+    // Firebase требует свежий вход для удаления — переавторизуемся тем же
+    // провайдером (Google/Apple) и пробуем снова.
+    if ((e as {code?: string})?.code === 'auth/requires-recent-login') {
+      await reauthenticateCurrentUser();
+      const current = auth.currentUser;
+      if (current) {
+        await deleteUser(current);
+      }
+      return;
+    }
+    throw e;
+  }
 }
