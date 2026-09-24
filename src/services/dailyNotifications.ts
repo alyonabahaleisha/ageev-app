@@ -74,12 +74,19 @@ async function fetchStoryTexts(
  * Вызывается на каждом старте приложения — так тексты подтягивают свежие
  * данные CMS, а расписание не истощается, пока приложением пользуются.
  */
-export async function ensureDailyAffirmationNotifications(): Promise<void> {
+export async function ensureDailyAffirmationNotifications(
+  /** true — показать системный запрос (только по действию пользователя). */
+  askPermission: boolean = false,
+): Promise<void> {
   try {
     if (!(await settingsReady()).dailyAffirmationEnabled) {
       return;
     }
-    const settings = await notifee.requestPermission();
+    // При запуске приложения разрешение только проверяется: системный диалог
+    // показывается лишь когда пользователь сам включает тумблер.
+    const settings = askPermission
+      ? await notifee.requestPermission()
+      : await notifee.getNotificationSettings();
     if (settings.authorizationStatus < AuthorizationStatus.AUTHORIZED) {
       return;
     }
@@ -158,7 +165,17 @@ export async function ensureDailyAffirmationNotifications(): Promise<void> {
       );
     }
   } catch (e) {
-    console.log('FETCHCHECK notifications ERROR', (e as Error)?.message);
+    __DEV__ && console.log('FETCHCHECK notifications ERROR', (e as Error)?.message);
+  }
+}
+
+/** Есть ли разрешение на уведомления (без показа системного запроса). */
+export async function hasNotificationPermission(): Promise<boolean> {
+  try {
+    const s = await notifee.getNotificationSettings();
+    return s.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
+  } catch {
+    return false;
   }
 }
 
@@ -186,7 +203,9 @@ const PRACTICE_HOURS: Record<ReminderTime, number> = {
 };
 
 /** Перепланировать напоминания о практике по текущим настройкам. */
-export async function ensurePracticeReminders(): Promise<void> {
+export async function ensurePracticeReminders(
+  askPermission: boolean = false,
+): Promise<void> {
   try {
     const appSettings = await settingsReady();
     // Старое расписание под снос в любом случае — настройки могли измениться.
@@ -199,7 +218,9 @@ export async function ensurePracticeReminders(): Promise<void> {
     if (!appSettings.remindersEnabled || appSettings.reminderTimes.length === 0) {
       return;
     }
-    const perm = await notifee.requestPermission();
+    const perm = askPermission
+      ? await notifee.requestPermission()
+      : await notifee.getNotificationSettings();
     if (perm.authorizationStatus < AuthorizationStatus.AUTHORIZED) {
       return;
     }
@@ -249,7 +270,7 @@ export async function ensurePracticeReminders(): Promise<void> {
       }
     }
   } catch (e) {
-    console.log('FETCHCHECK practice reminders ERROR', (e as Error)?.message);
+    __DEV__ && console.log('FETCHCHECK practice reminders ERROR', (e as Error)?.message);
   }
 }
 

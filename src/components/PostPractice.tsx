@@ -101,12 +101,26 @@ export function PostPracticeOverlay({onClose, onOpenTrack}: Props) {
               </TouchableOpacity>
             ))}
           </View>
+          {/* «Продолжить» активна только после выбора — пропуск делается
+              отдельной кнопкой, чтобы пустой ответ не путался с пропуском. */}
           <TouchableOpacity
             activeOpacity={0.85}
+            disabled={mood === null}
             onPress={() => setStep('next')}
-            style={styles.ctaBtn}>
+            style={[styles.ctaBtn, mood === null && styles.ctaBtnDisabled]}>
             <Text style={styles.ctaText}>
               {t('post_practice_continue', 'Продолжить')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              setMood(null);
+              setStep('next');
+            }}
+            style={styles.skipBtn}>
+            <Text style={styles.skipText}>
+              {t('post_practice_skip', 'Пропустить')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -287,7 +301,21 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
+  },  ctaBtnDisabled: {
+    opacity: 0.5,
   },
+  skipBtn: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  skipText: {
+    ...typography.body,
+    color: colors.white,
+    opacity: 0.8,
+  },
+
   ctaText: {
     ...typography.button,
     color: colors.dark,

@@ -21,6 +21,7 @@ import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const SECTION_MARGIN = 24;
 // Design 411:8139: full-width 342×170 cards stacked vertically, 12px apart.
@@ -60,7 +61,7 @@ function MeditationCard({item}: {item: Meditation}) {
       <View style={styles.cardContent}>
         <View style={styles.cardLeft}>
           <View style={styles.cardTextBlock}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
+            <Text style={styles.cardTitle} numberOfLines={2} android_hyphenationFrequency="full">
               {item.title}
             </Text>
             <Text style={styles.cardSubtitle} numberOfLines={2}>
@@ -95,6 +96,7 @@ function MeditationCard({item}: {item: Meditation}) {
 }
 
 export function MeditationsScreen({onBack}: Props) {
+  useBackHandler(() => onBack());
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
   const {meditations, loading} = useMeditations();

@@ -124,7 +124,7 @@ export function useDailyStory(): {content: StoryContent | null; loading: boolean
           setLoading(false);
         }
       } catch (e) {
-        console.log('FETCHCHECK dailyStories ERROR', (e as Error)?.message);
+        __DEV__ && console.log('FETCHCHECK dailyStories ERROR', (e as Error)?.message);
         if (!cancelled) {
           setContent(null);
           setLoading(false);

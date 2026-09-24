@@ -27,6 +27,8 @@ import {
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
+import {useHideMiniPlayer} from '../context/PlayerContext';
 
 const SECTION_MARGIN = 24;
 
@@ -37,6 +39,9 @@ const SECTION_MARGIN = 24;
 type Props = {onClose: () => void};
 
 export function EditProfileScreen({onClose}: Props) {
+  useBackHandler(() => onClose());
+  // Мини-бар перекрывал бы текст и поля формы под шапкой.
+  useHideMiniPlayer();
   const {top, bottom} = useSafeAreaInsets();
   const {user} = useAuth();
   const t = useUIStrings();

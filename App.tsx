@@ -57,6 +57,10 @@ import {WebPageScreen} from './src/screens/WebPageScreen';
 import {DonationScreen} from './src/screens/DonationScreen';
 import {useDailyStory, useStorySeen} from './src/services/stories';
 import {prefetchImages} from './src/components/RemoteImage';
+import {
+  BackHandlerActiveContext,
+  useBackHandler,
+} from './src/hooks/useBackHandler';
 
 TrackPlayer.registerPlaybackService(() => PlaybackService);
 
@@ -76,7 +80,11 @@ function App() {
 }
 
 const VISIBLE = 1;
-const HIDDEN = 0.001;
+// Неактивные вкладки полностью прозрачны: при 0.001 Android продолжал
+// рисовать все три вкладки со всеми картинками в каждом кадре — текстуры не
+// помещались в GPU-кэш и перезаливались каждый кадр (gfxinfo: 100% медленных
+// кадров, «Slow bitmap uploads» на каждом кадре). При 0 вкладка не рисуется.
+const HIDDEN = 0;
 const WELCOME_SEEN_KEY = 'welcome_seen_v1';
 
 function AppContent() {
@@ -215,6 +223,18 @@ function AppContent() {
     if (openAuth) setShowAuth(true);
   }
 
+  // Системное «назад» (Android): оверлеи и вложенные экраны подписываются
+  // сами (useBackHandler) и получают нажатие раньше. Сюда оно доходит, только
+  // когда открыта сама вкладка: не с главной — переход на главную, с главной —
+  // стандартное поведение системы (приложение сворачивается).
+  useBackHandler(() => {
+    if (activeTab !== 0) {
+      handleTabPress(0);
+      return true;
+    }
+    return false;
+  });
+
   function handleTabPress(index: number) {
     // Правки (Figma 489:11217): из «Аффирмаций» и «О школе» вкладки не
     // срабатывали — таб переключался под оверлеем, а оверлей оставался
@@ -291,19 +311,23 @@ function AppContent() {
       <Animated.View
         style={[styles.screenSlot, {opacity: opacity1}]}
         pointerEvents={activeTab !== 1 ? 'none' : 'auto'}>
-        <ThinkingScreen
-          resetSignal={thinkingReset}
-          onOpenState={setSelectedState}
-        />
+        <BackHandlerActiveContext.Provider value={activeTab === 1}>
+          <ThinkingScreen
+            resetSignal={thinkingReset}
+            onOpenState={setSelectedState}
+          />
+        </BackHandlerActiveContext.Provider>
       </Animated.View>
 
       <Animated.View
         style={[styles.screenSlot, {opacity: opacity2}]}
         pointerEvents={activeTab !== 2 ? 'none' : 'auto'}>
-        <PracticesScreen
-          resetSignal={practicesReset}
-          formatSignal={practicesFormat}
-        />
+        <BackHandlerActiveContext.Provider value={activeTab === 2}>
+          <PracticesScreen
+            resetSignal={practicesReset}
+            formatSignal={practicesFormat}
+          />
+        </BackHandlerActiveContext.Provider>
       </Animated.View>
 
       {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is

@@ -47,7 +47,7 @@ export function useContentFilters<
           });
           setAreas(m);
         },
-        err => console.log('FETCHCHECK lifeAreas ERROR', err.message),
+        err => __DEV__ && console.log('FETCHCHECK lifeAreas ERROR', err.message),
       ),
     [],
   );

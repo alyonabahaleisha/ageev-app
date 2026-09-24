@@ -19,6 +19,9 @@ import {WebPageScreen} from './WebPageScreen';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useAuth} from '../context/AuthContext';
+import {useBackHandler} from '../hooks/useBackHandler';
+import {useHideMiniPlayer} from '../context/PlayerContext';
 
 const SECTION_MARGIN = 24;
 const BTN_SIZE = 34;
@@ -53,13 +56,20 @@ function Checkbox({
 }
 
 export function DonationScreen({onClose}: Props) {
+  useBackHandler(() => onClose());
+  // Мини-бар перекрывал бы текст и поля формы под шапкой.
+  useHideMiniPlayer();
   const {top, bottom} = useSafeAreaInsets();
   const t = useUIStrings();
 
   const [step, setStep] = useState<'form' | 'web' | 'thanks'>('form');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
+  // Вошедшему пользователю поля заполняются из профиля (Google/VK/email) и
+  // остаются редактируемыми; гостю — пустые.
+  const {user} = useAuth();
+  const nameParts = (user?.displayName || '').trim().split(/\s+/);
+  const [firstName, setFirstName] = useState(nameParts[0] || '');
+  const [lastName, setLastName] = useState(nameParts.slice(1).join(' '));
+  const [email, setEmail] = useState(user?.email || '');
   const [amount, setAmount] = useState('500');
   const [offerAgreed, setOfferAgreed] = useState(false);
   const [personalAgreed, setPersonalAgreed] = useState(false);

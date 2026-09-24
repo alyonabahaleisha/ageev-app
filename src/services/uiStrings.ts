@@ -21,7 +21,7 @@ function ensureStarted() {
       listeners.forEach(l => l());
     },
     err => {
-      console.log('FETCHCHECK ui_strings ERROR', err.message);
+      __DEV__ && console.log('FETCHCHECK ui_strings ERROR', err.message);
     },
   );
 }

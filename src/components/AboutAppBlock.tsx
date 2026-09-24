@@ -13,7 +13,6 @@ import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {fonts} from '../theme/typography';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // Mirrors Figma node "о приложении" (318:4215): a centred text block above the
 // decorative portrait. The img area (portrait + 1px gradient ring + glow dots,
@@ -40,6 +39,12 @@ const GLINT = C * 0.16; // length of the travelling light segment (soft, ~58°)
 function StoryRing() {
   const t = useRef(new Animated.Value(0)).current; // 0→1 = one lap
 
+  // Производительность: раньше анимировался SVG-атрибут strokeDashoffset без
+  // нативного драйвера — JS пересчитывал кадр, а react-native-svg на Android
+  // перерисовывал SVG в новый Bitmap и заново загружал его в GPU на каждом
+  // кадре (gfxinfo: «Slow bitmap uploads» почти на каждом кадре), и так бесконечно,
+  // пока главная смонтирована. Теперь SVG-дуга статична (рисуется один раз), а
+  // бег блика по кольцу — это поворот контейнера на нативном драйвере.
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
@@ -47,16 +52,20 @@ function StoryRing() {
           toValue: 1,
           duration: 2600, // slow, gentle lap
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false, // animating an svg prop (strokeDashoffset)
+          useNativeDriver: true,
         }),
         Animated.delay(3400), // rest between laps
+        Animated.timing(t, {toValue: 0, duration: 0, useNativeDriver: true}),
       ]),
     );
     anim.start();
     return () => anim.stop();
   }, [t]);
 
-  const dashoffset = t.interpolate({inputRange: [0, 1], outputRange: [0, -C]});
+  const rotate = t.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
   const opacity = t.interpolate({
     inputRange: [0, 0.06, 0.85, 1],
     outputRange: [0, 1, 1, 0], // fade in at the start of the lap, out at the end
@@ -68,9 +77,10 @@ function StoryRing() {
       pointerEvents="none"
       style={[styles.ring, {left: RING_CX - c, top: RING_CY - c, width: RING_BOX, height: RING_BOX}]}>
       {/* travelling glint (soft glow + bright core) */}
-      <Animated.View style={[StyleSheet.absoluteFill, {opacity}]}>
+      <Animated.View
+        style={[StyleSheet.absoluteFill, {opacity, transform: [{rotate}]}]}>
         <Svg width={RING_BOX} height={RING_BOX}>
-          <AnimatedCircle
+          <Circle
             cx={c}
             cy={c}
             r={RING_R}
@@ -79,9 +89,8 @@ function StoryRing() {
             strokeLinecap="round"
             fill="none"
             strokeDasharray={[GLINT, C]}
-            strokeDashoffset={dashoffset}
           />
-          <AnimatedCircle
+          <Circle
             cx={c}
             cy={c}
             r={RING_R}
@@ -90,7 +99,6 @@ function StoryRing() {
             strokeLinecap="round"
             fill="none"
             strokeDasharray={[GLINT, C]}
-            strokeDashoffset={dashoffset}
           />
         </Svg>
       </Animated.View>

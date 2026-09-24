@@ -3,6 +3,7 @@ package com.ageevapp
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
@@ -12,6 +13,8 @@ import com.facebook.react.defaults.DefaultReactActivityDelegate
 class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    // Нативный сплэш должен ставиться до super.onCreate.
+    installSplashScreen()
     super.onCreate(savedInstanceState)
     // Системные бары прозрачные, приложение рисуется под ними (edge-to-edge):
     // нижняя системная панель «просвечивает» градиент, отступы контенту даёт
@@ -34,6 +37,16 @@ class MainActivity : ReactActivity() {
    * rendering of the component.
    */
   override fun getMainComponentName(): String = "AgeevApp"
+
+  /**
+   * «Назад» на главном экране (JS его не обработал): сворачиваем приложение,
+   * а не закрываем Activity. Иначе при возврате React-дерево создаётся заново
+   * и теряется состояние плеера (мини-бар «Продолжить практику»), хотя звук
+   * продолжает играть.
+   */
+  override fun invokeDefaultOnBackPressed() {
+    moveTaskToBack(true)
+  }
 
   /**
    * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]

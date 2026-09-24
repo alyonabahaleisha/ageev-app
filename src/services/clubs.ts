@@ -30,12 +30,12 @@ export function useClubs() {
       collection(db, 'clubs'),
       snapshot => {
         const docs = snapshot.docs.map(d => ({id: d.id, ...d.data()} as Club));
-        console.log('FETCHCHECK clubs', docs.length);
+        __DEV__ && console.log('FETCHCHECK clubs', docs.length);
         setClubs(docs);
         setLoading(false);
       },
       err => {
-        console.log('FETCHCHECK clubs ERROR', (err as Error)?.message);
+        __DEV__ && console.log('FETCHCHECK clubs ERROR', (err as Error)?.message);
         setLoading(false);
       },
     );

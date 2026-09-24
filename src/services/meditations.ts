@@ -51,13 +51,13 @@ export function useMeditations() {
           id: doc.id,
           ...doc.data(),
         })) as Meditation[];
-        console.log('FETCHCHECK meditations', docs.length);
+        __DEV__ && console.log('FETCHCHECK meditations', docs.length);
         setMeditations(docs);
         prefetchImages(docs.map(d => d.coverUrl));
         setLoading(false);
       },
       err => {
-        console.log('FETCHCHECK meditations ERROR', err.message);
+        __DEV__ && console.log('FETCHCHECK meditations ERROR', err.message);
         setError(err.message);
         setLoading(false);
       },

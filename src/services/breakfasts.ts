@@ -31,13 +31,13 @@ export function useBreakfasts() {
           id: doc.id,
           ...doc.data(),
         })) as Breakfast[];
-        console.log('FETCHCHECK breakfasts', docs.length);
+        __DEV__ && console.log('FETCHCHECK breakfasts', docs.length);
         setBreakfasts(docs);
         prefetchImages(docs.map(d => d.coverUrl).filter(Boolean));
         setLoading(false);
       },
       err => {
-        console.log('FETCHCHECK breakfasts ERROR', err.message);
+        __DEV__ && console.log('FETCHCHECK breakfasts ERROR', err.message);
         setError(err.message);
         setLoading(false);
       },

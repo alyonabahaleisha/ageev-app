@@ -123,13 +123,13 @@ export function useMindsetStates() {
       q,
       snapshot => {
         const docs = snapshot.docs.map(d => normalize(d.id, d.data()));
-        console.log('FETCHCHECK mindsetStates', docs.length);
+        __DEV__ && console.log('FETCHCHECK mindsetStates', docs.length);
         setStates(docs);
         prefetchImages(docs.map(d => d.coverImage));
         setLoading(false);
       },
       err => {
-        console.log('FETCHCHECK mindsetStates ERROR', (err as Error)?.message);
+        __DEV__ && console.log('FETCHCHECK mindsetStates ERROR', (err as Error)?.message);
         setLoading(false);
       },
     );

@@ -28,6 +28,8 @@ import {
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
+import {useHideMiniPlayer} from '../context/PlayerContext';
 
 const SECTION_MARGIN = 24;
 const SHEET_RADIUS = 30;
@@ -41,6 +43,9 @@ type Props = {onClose: () => void};
  * Полноэкранный оверлей: затемнение + нижний лист от статус-бара до низа.
  */
 export function AuthScreen({onClose}: Props) {
+  useBackHandler(() => onClose());
+  // Мини-бар перекрывал бы текст и поля формы под шапкой.
+  useHideMiniPlayer();
   const {top, bottom} = useSafeAreaInsets();
   const t = useUIStrings();
 

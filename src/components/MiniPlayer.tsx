@@ -15,13 +15,24 @@ import {fonts, typography} from '../theme/typography';
 // возвращает плеер, кнопка слева — play/pause на месте, крестик прячет бар
 // до следующего запуска трека.
 export function MiniPlayer() {
-  const {track, isVisible, miniDismissed, reopenPlayer, dismissMini} =
-    usePlayer();
+  const {
+    track,
+    isVisible,
+    miniDismissed,
+    reopenPlayer,
+    dismissMini,
+    started,
+    togglePlay,
+    miniHidden,
+  } = usePlayer();
   const {top} = useSafeAreaInsets();
   const playback = usePlaybackState();
   const t = useUIStrings();
 
-  if (!track || isVisible || miniDismissed) return null;
+  // Трек, открытый только «на описание» (без Play), не считается практикой.
+  if (!track || !started || isVisible || miniDismissed || miniHidden) {
+    return null;
+  }
 
   const isPlaying = playback.state === State.Playing;
 
@@ -32,9 +43,9 @@ export function MiniPlayer() {
       <TouchableOpacity
         activeOpacity={0.8}
         style={styles.playBtn}
-        onPress={() =>
-          (isPlaying ? TrackPlayer.pause() : TrackPlayer.play()).catch(() => {})
-        }>
+        onPress={() => {
+          togglePlay().catch(() => {});
+        }}>
         <SvgXml
           xml={isPlaying ? ICON_PAUSE : ICON_PLAY_TRIANGLE}
           width={isPlaying ? 16 : 14}

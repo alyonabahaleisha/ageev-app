@@ -55,7 +55,9 @@ function StateCard({
           )}
           <View style={styles.cardOverlay} />
           <View style={styles.cardLabelWrap}>
-            <Text style={styles.cardLabel}>{state.title}</Text>
+            <Text style={styles.cardLabel} android_hyphenationFrequency="full">
+              {state.title}
+            </Text>
           </View>
         </View>
       </View>
@@ -263,7 +265,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: CARD_W,
     height: CARD_H,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    // Затемнение усилено (0.3 → 0.42): белые подписи терялись на светлых
+    // бежевых фото.
+    backgroundColor: 'rgba(0,0,0,0.42)',
   },
   cardLabelWrap: {
     position: 'absolute',
@@ -277,5 +281,8 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.white,
     textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 4,
   },
 });

@@ -1,7 +1,7 @@
 {
   "hosting": {
     "public": "public",
-    "ignore": ["firebase.json", "**/.*"],
+    "ignore": ["firebase.json", "**/.gitignore", "**/.DS_Store", "**/.firebase/**"],
     "redirects": [
       {
         "source": "/",
@@ -16,6 +16,13 @@
       }
     ],
     "headers": [
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Cache-Control", "value": "max-age=3600"}
+        ]
+      },
       {
         "source": "/.well-known/apple-app-site-association",
         "headers": [

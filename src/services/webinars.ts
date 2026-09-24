@@ -32,13 +32,13 @@ export function useWebinars() {
         const docs = snapshot.docs.map(
           d => ({id: d.id, ...d.data()} as Webinar),
         );
-        console.log('FETCHCHECK webinars', docs.length);
+        __DEV__ && console.log('FETCHCHECK webinars', docs.length);
         setWebinars(docs);
         prefetchImages(docs.map(d => d.coverUrl));
         setLoading(false);
       },
       err => {
-        console.log('FETCHCHECK webinars ERROR', (err as Error)?.message);
+        __DEV__ && console.log('FETCHCHECK webinars ERROR', (err as Error)?.message);
         setLoading(false);
       },
     );
