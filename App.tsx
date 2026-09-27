@@ -325,6 +325,8 @@ function AppContent() {
       <Animated.View
         style={[styles.screenSlot, {opacity: opacity0}]}
         pointerEvents={activeTab !== 0 ? 'none' : 'auto'}>
+        {activeTab === 0 && (
+          <>
         <ScrollView
           ref={homeScrollRef}
           style={styles.scroll}
@@ -378,28 +380,34 @@ function AppContent() {
         <FixedHeader>
           <HomeHeader />
         </FixedHeader>
+          </>
+        )}
       </Animated.View>
 
       <Animated.View
         style={[styles.screenSlot, {opacity: opacity1}]}
         pointerEvents={activeTab !== 1 ? 'none' : 'auto'}>
-        <BackHandlerActiveContext.Provider value={activeTab === 1}>
-          <ThinkingScreen
-            resetSignal={thinkingReset}
-            onOpenState={setSelectedState}
-          />
-        </BackHandlerActiveContext.Provider>
+        {activeTab === 1 && (
+          <BackHandlerActiveContext.Provider value={activeTab === 1}>
+            <ThinkingScreen
+              resetSignal={thinkingReset}
+              onOpenState={setSelectedState}
+            />
+          </BackHandlerActiveContext.Provider>
+        )}
       </Animated.View>
 
       <Animated.View
         style={[styles.screenSlot, {opacity: opacity2}]}
         pointerEvents={activeTab !== 2 ? 'none' : 'auto'}>
-        <BackHandlerActiveContext.Provider value={activeTab === 2}>
-          <PracticesScreen
-            resetSignal={practicesReset}
-            formatSignal={practicesFormat}
-          />
-        </BackHandlerActiveContext.Provider>
+        {activeTab === 2 && (
+          <BackHandlerActiveContext.Provider value={activeTab === 2}>
+            <PracticesScreen
+              resetSignal={practicesReset}
+              formatSignal={practicesFormat}
+            />
+          </BackHandlerActiveContext.Provider>
+        )}
       </Animated.View>
 
       {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is
