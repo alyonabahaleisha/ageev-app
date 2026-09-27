@@ -25,6 +25,7 @@ import {useClubs} from '../services/clubs';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const SECTION_MARGIN = 24;
 const BTN_SIZE = 47;
@@ -70,15 +71,20 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
   }
 
   const trimmed = query.trim().toLowerCase();
-  const results = trimmed
-    ? clubs.filter(c => c.city.toLowerCase().includes(trimmed))
-    : clubs;
+  // Единое правило сортировки: по алфавиту с учётом кириллицы и латиницы
+  // (раньше порядок был как в Firestore, и «Лондон» выпадал из списка).
+  const results = (
+    trimmed ? clubs.filter(c => c.city.toLowerCase().includes(trimmed)) : clubs
+  )
+    .slice()
+    .sort((a, b) => a.city.localeCompare(b.city, 'ru', {sensitivity: 'base'}));
 
   const closeSearch = () => {
     setSearchActive(false);
     setQuery('');
     Keyboard.dismiss();
   };
+  useBackHandler(closeSearch, searchActive);
 
   const count = clubs.length;
   const cityForms: [string, string, string] = [

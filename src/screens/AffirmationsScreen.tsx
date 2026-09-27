@@ -37,6 +37,8 @@ import {TEXT_SCALES, useAppSettings} from '../services/settings';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
+import {useHideMiniPlayer} from '../context/PlayerContext';
 
 const {width: SCREEN_W, height: SCREEN_H} = Dimensions.get('window');
 const BTN_SIZE = 34;
@@ -67,6 +69,9 @@ type Props = {
 };
 
 export function AffirmationsScreen({onBack, initial}: Props) {
+  useBackHandler(() => onBack());
+  // Мини-бар стоял ровно на месте фильтров / попапов — на этом экране скрыт.
+  useHideMiniPlayer();
   const {top, bottom} = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState(0);
   const [shareItem, setShareItem] = useState<ShareAffirmationItem | null>(
@@ -126,10 +131,24 @@ export function AffirmationsScreen({onBack, initial}: Props) {
     }
     if (idx < 0) idx = dailyAffirmationIndex(affirmations.length);
     const offset = pageH * idx;
-    requestAnimationFrame(() =>
-      listRef.current?.scrollToOffset({offset, animated: false}),
-    );
-  }, [affirmations, initial, pageH]);
+    requestAnimationFrame(() => {
+      // Пользователь мог начать свайп, пока ждали кадр, — не дёргаем назад.
+      if (!userTouchedPager.current) {
+        listRef.current?.scrollToOffset({offset, animated: false});
+      }
+    });
+    // initial — объект, создаваемый на каждый рендер родителя: зависимость по
+    // полям, иначе эффект перескакивал на «аффирмацию дня» после каждого
+    // рендера, в том числе посреди свайпа.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [affirmations, initial?.id, initial?.text, pageH]);
+
+  // Резервный способ листать (и для доступности): тап по подсказке «Проведите
+  // вверх» открывает следующую аффирмацию.
+  const goToPage = (index: number) => {
+    userTouchedPager.current = true;
+    listRef.current?.scrollToOffset({offset: pageH * index, animated: true});
+  };
 
   const filterTop = top + 7 + BTN_SIZE + 14;
   // Bound the affirmation text between the filter chips and the swipe hint so
@@ -174,10 +193,17 @@ export function AffirmationsScreen({onBack, initial}: Props) {
         key={activeFilter}
         data={filtered}
         keyExtractor={item => item.id}
-        pagingEnabled
+        // Постраничная прокрутка: один свайп — одна аффирмация.
+        snapToInterval={pageH}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        disableIntervalMomentum
         onLayout={e => {
           const h = e.nativeEvent.layout.height;
           if (h > 0 && Math.abs(h - pageH) > 1) setPageH(h);
+        }}
+        onTouchStart={() => {
+          userTouchedPager.current = true;
         }}
         onScrollBeginDrag={() => {
           userTouchedPager.current = true;
@@ -244,7 +270,11 @@ export function AffirmationsScreen({onBack, initial}: Props) {
             </View>
             {/* Swipe-up hint — only on the initially visible card */}
             {index === dailyIdx && (
-              <View style={[styles.hint, {bottom: pageH * HINT_BOTTOM_RATIO}]}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                onPress={() => goToPage(index + 1)}
+                style={[styles.hint, {bottom: pageH * HINT_BOTTOM_RATIO}]}>
                 <Text style={styles.hintText}>
                   {t(
                     'affirmations_swipe_hint',
@@ -252,7 +282,7 @@ export function AffirmationsScreen({onBack, initial}: Props) {
                   )}
                 </Text>
                 <SvgXml xml={ICON_ARROW_UP} width={24} height={24} />
-              </View>
+              </TouchableOpacity>
             )}
           </View>
         )}

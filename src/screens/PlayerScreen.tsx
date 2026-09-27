@@ -58,7 +58,17 @@ function formatTime(seconds: number): string {
 const clampRatio = (r: number) => Math.max(0, Math.min(1, r));
 
 function ProgressBar() {
-  const {position, duration} = useProgress(500);
+  const progressState = useProgress(500);
+  const {track, started} = usePlayer();
+  // Трек открыт «на описание» и ещё не запускался — в TrackPlayer может быть
+  // прежний трек, его прогресс не показываем.
+  const position = started ? progressState.position : 0;
+  // Пока плеер не загрузил трек, useProgress отдаёт 0 — показываем длительность
+  // из каталога вместо «00:00 / 00:00», затем фактическую.
+  const duration =
+    started && progressState.duration > 0
+      ? progressState.duration
+      : track?.durationSeconds ?? 0;
   const [barWidth, setBarWidth] = useState(0);
   // While the user scrubs, the bar follows the finger (dragRatio) instead of
   // the playback position; the actual seek happens once, on release.
@@ -297,6 +307,7 @@ function BufferingRing({fade}: {fade: Animated.Value}) {
 }
 
 function Controls() {
+  const {togglePlay} = usePlayer();
   const state = usePlaybackState();
   const isPlaying = state.state === State.Playing;
   // Audio is being fetched/buffered (slow networks make this noticeable) —
@@ -344,7 +355,7 @@ function Controls() {
       {/* Replay 10 */}
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => TrackPlayer.seekBy(-10)}
+        onPress={() => TrackPlayer.seekBy(-10).catch(() => {})}
         style={ctrl.skipBtn}>
         <SvgXml xml={ICON_REPLAY10} width={35} height={35} />
       </TouchableOpacity>
@@ -353,7 +364,9 @@ function Controls() {
       <TouchableOpacity
         activeOpacity={0.8}
         style={ctrl.playBtn}
-        onPress={() => (isPlaying ? TrackPlayer.pause() : TrackPlayer.play())}>
+        onPress={() => {
+          togglePlay().catch(() => {});
+        }}>
         <Animated.View style={{opacity: iconOpacity}}>
           <SvgXml
             xml={isPlaying ? ICON_PAUSE : ICON_PLAY_TRIANGLE}
@@ -367,7 +380,7 @@ function Controls() {
       {/* Forward 10 */}
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => TrackPlayer.seekBy(10)}
+        onPress={() => TrackPlayer.seekBy(10).catch(() => {})}
         style={ctrl.skipBtn}>
         <SvgXml xml={ICON_FORWARD10} width={35} height={35} />
       </TouchableOpacity>
@@ -896,7 +909,8 @@ export function PlayerScreen() {
             onClose={() => setPostPractice(false)}
             onOpenTrack={next => {
               setPostPractice(false);
-              openPlayer(next);
+              // Пользователь сам выбрал следующую практику — сразу играем.
+              openPlayer(next, {autoplay: true});
             }}
           />
         )}

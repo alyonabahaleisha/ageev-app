@@ -23,6 +23,7 @@ import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const SECTION_MARGIN = 24;
 const CARD_GAP = 12;
@@ -64,7 +65,7 @@ function BreakfastCard({item}: {item: Breakfast}) {
         pointerEvents="none"
       />
       <View style={styles.cardInner}>
-        <Text style={styles.cardTitle} numberOfLines={4}>
+        <Text style={styles.cardTitle} numberOfLines={4} android_hyphenationFrequency="full">
           {item.title}
         </Text>
         {item.durationSeconds > 0 && (
@@ -100,6 +101,7 @@ function BreakfastCard({item}: {item: Breakfast}) {
 type Props = {onBack: () => void};
 
 export function BreakfastsScreen({onBack}: Props) {
+  useBackHandler(() => onBack());
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
   const {breakfasts, loading} = useBreakfasts();

@@ -22,6 +22,7 @@ import {useUIStrings} from '../services/uiStrings';
 import {useWebinars} from '../services/webinars';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const SECTION_MARGIN = 24;
 const THUMB = 80;
@@ -132,6 +133,7 @@ type Props = {
 };
 
 export function SearchScreen({onBack, onOpenCategory}: Props) {
+  useBackHandler(() => onBack());
   const {top, bottom} = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const {meditations} = useMeditations();

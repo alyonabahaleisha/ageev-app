@@ -15,6 +15,7 @@ import {STORY_SLIDES} from '../components/stories/StorySlides';
 import {StoryContent} from '../services/stories';
 import {usePlayer} from '../context/PlayerContext';
 import {colors} from '../theme/colors';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const STORY_DURATION = 6000; // ms per slide
 const HOLD_THRESHOLD = 200; // ms; longer press = hold-to-pause, not a tap
@@ -33,6 +34,7 @@ type Props = {
 // Instagram-style stories viewer: auto-advancing segments up top, tap the right
 // side to skip forward / left to go back, press-and-hold to pause.
 export function StoriesScreen({content, onClose, onOpenPractices}: Props) {
+  useBackHandler(() => onClose());
   const {top} = useSafeAreaInsets();
   const {openPlayer} = usePlayer();
   const [index, setIndex] = useState(0);

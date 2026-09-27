@@ -17,6 +17,7 @@ import LinearGradient from '../components/LinearGradient';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const SECTION_MARGIN = 24;
 const BTN_SIZE = 34;
@@ -61,6 +62,7 @@ const DEFAULT_STATS: {value: string; label: string}[] = [
 type Props = {onBack: () => void};
 
 export function SchoolScreen({onBack}: Props) {
+  useBackHandler(() => onBack());
   const {top, bottom} = useSafeAreaInsets();
   const t = useUIStrings();
   const sections = DEFAULT_SECTIONS.map((s, i) => ({

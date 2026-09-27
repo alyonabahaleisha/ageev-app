@@ -55,7 +55,7 @@ export function subscribeCachedQuery<T extends {id: string}>(
       AsyncStorage.setItem(PREFIX + key, JSON.stringify(docs)).catch(() => {});
     },
     err => {
-      console.log(`FETCHCHECK ${key} ERROR`, err.message);
+      __DEV__ && console.log(`FETCHCHECK ${key} ERROR`, err.message);
       onError?.(err.message, hasData);
     },
   );
@@ -94,7 +94,7 @@ export function subscribeCachedDoc<T extends DocumentData>(
       }
     },
     err => {
-      console.log(`FETCHCHECK ${key} ERROR`, err.message);
+      __DEV__ && console.log(`FETCHCHECK ${key} ERROR`, err.message);
       onError?.(err.message, hasData);
     },
   );

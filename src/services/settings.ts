@@ -21,7 +21,9 @@ const DEFAULTS: AppSettings = {
   reminderTimes: ['morning'],
   textSize: 'standard',
   angelOnHome: true,
-  dailyAffirmationEnabled: true,
+  // Выключено до явного выбора пользователя: разрешение на уведомления
+  // запрашивается, только когда он сам включает переключатель в настройках.
+  dailyAffirmationEnabled: false,
 };
 
 /** Множитель для длинных читаемых текстов (аффирмации, описания). */

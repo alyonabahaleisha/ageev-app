@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import TrackPlayer, {Capability, State} from 'react-native-track-player';
@@ -14,6 +15,7 @@ import {
 import {uiString} from '../services/uiStrings';
 import {track as trackEvent} from '../services/analytics';
 import {resolveMediaUrl} from '../services/mediaRegion';
+import {BackHandlerActiveContext} from '../hooks/useBackHandler';
 
 export type PlayerTrack = {
   id: string;
@@ -32,7 +34,20 @@ export type PlayerTrack = {
 type PlayerContextValue = {
   isVisible: boolean;
   track: PlayerTrack | null;
-  openPlayer: (track: PlayerTrack) => Promise<void>;
+  /**
+   * Открыть плеер с описанием трека. По умолчанию звук НЕ включается
+   * (решение по продукту: тап по карточке открывает описание, запуск — кнопкой
+   * Play). autoplay: true — сразу играть (напр. «следующая практика»).
+   */
+  openPlayer: (track: PlayerTrack, opts?: {autoplay?: boolean}) => Promise<void>;
+  /** Play/pause текущего трека; при первом Play загружает трек в плеер. */
+  togglePlay: () => Promise<void>;
+  /** Трек хотя бы раз запускали — только тогда показывается мини-бар. */
+  started: boolean;
+  /** Мини-бар скрыт открытым экраном, который он перекрывал бы. */
+  miniHidden: boolean;
+  /** Скрыть мини-бар, пока экран открыт; возвращает функцию отмены. */
+  pushHideMini: () => () => void;
   closePlayer: () => void;
   /** Hide the player UI without pausing — e.g. to peek at Избранное. */
   hidePlayer: () => void;
@@ -47,6 +62,10 @@ const PlayerContext = createContext<PlayerContextValue>({
   isVisible: false,
   track: null,
   openPlayer: async () => {},
+  togglePlay: async () => {},
+  started: false,
+  miniHidden: false,
+  pushHideMini: () => () => {},
   closePlayer: () => {},
   hidePlayer: () => {},
   reopenPlayer: () => {},
@@ -85,21 +104,27 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   const [track, setTrack] = useState<PlayerTrack | null>(null);
   const [miniDismissed, setMiniDismissed] = useState(false);
 
-  // Set the player up once at launch so the first tap doesn't pay for it.
-  useEffect(() => {
-    ensurePlayer().catch(() => {});
+  const [started, setStarted] = useState(false);
+  const [hideMiniCount, setHideMiniCount] = useState(0);
+  const pushHideMini = useCallback(() => {
+    setHideMiniCount(n => n + 1);
+    return () => setHideMiniCount(n => Math.max(0, n - 1));
   }, []);
+  // Актуальный трек для togglePlay (колбэк стабилен, state в замыкании устарел бы).
+  const trackRef = useRef<PlayerTrack | null>(null);
 
-  const openPlayer = useCallback(async (t: PlayerTrack) => {
+  // Плеер (и foreground-сервис MusicService) НЕ поднимается при запуске
+  // приложения: Google Play требует mediaPlayback-сервис только при реальном
+  // воспроизведении, а на Samsung система гасила простаивающий сервис.
+  // Инициализация — при первом Play (loadAndPlay).
+  const loadAndPlay = useCallback(async (t: PlayerTrack) => {
+    // Реальный старт практики — здесь (не при открытии описания).
     trackEvent('practice_start', {
       track_id: t.id,
       track_title: t.title,
       content_kind: t.kind ?? 'other',
     });
-    // Show the player instantly; the audio pipeline spins up behind it so the
-    // tap always gets an immediate response.
-    setTrack(t);
-    setIsVisible(true);
+    setStarted(true);
     setMiniDismissed(false);
     try {
       await ensurePlayer();
@@ -157,6 +182,51 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
     }
   }, []);
 
+  const openPlayer = useCallback(
+    async (t: PlayerTrack, opts?: {autoplay?: boolean}) => {
+      // Show the player instantly; the audio pipeline spins up behind it so
+      // the tap always gets an immediate response.
+      const switching = trackRef.current?.id !== t.id;
+      trackRef.current = t;
+      setTrack(t);
+      setIsVisible(true);
+      if (opts?.autoplay) {
+        await loadAndPlay(t);
+        return;
+      }
+      if (switching && playerReady) {
+        // Другой трек открыт «на описание»: прежний не должен звучать под ним.
+        // Позиция сохраняется, чтобы потом продолжить с того же места.
+        try {
+          const active = await TrackPlayer.getActiveTrack();
+          if (active?.id && active.id !== t.id) {
+            const {position, duration} = await TrackPlayer.getProgress();
+            await savePlaybackPosition(String(active.id), position, duration);
+            await TrackPlayer.pause();
+          }
+        } catch {}
+        setStarted(false);
+      }
+    },
+    [loadAndPlay],
+  );
+
+  const togglePlay = useCallback(async () => {
+    const t = trackRef.current;
+    if (!t) return;
+    if (playerReady) {
+      const [active, {state}] = await Promise.all([
+        TrackPlayer.getActiveTrack().catch(() => undefined),
+        TrackPlayer.getPlaybackState(),
+      ]);
+      if (active?.id === t.id && state === State.Playing) {
+        await TrackPlayer.pause().catch(() => {});
+        return;
+      }
+    }
+    await loadAndPlay(t);
+  }, [loadAndPlay]);
+
   const closePlayer = useCallback(() => {
     // Remember where the user left off before hiding the player. Playback
     // keeps going — the «Продолжить практику» mini bar takes over; pausing
@@ -191,6 +261,10 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
         isVisible,
         track,
         openPlayer,
+        togglePlay,
+        started,
+        miniHidden: hideMiniCount > 0,
+        pushHideMini,
         closePlayer,
         hidePlayer,
         reopenPlayer,
@@ -204,4 +278,16 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
 
 export function usePlayer() {
   return useContext(PlayerContext);
+}
+
+/**
+ * Экран, который мини-бар «Продолжить практику» перекрывал бы (фильтры
+ * аффирмаций, попапы карты), прячет его на время показа.
+ */
+export function useHideMiniPlayer(active: boolean = true) {
+  const {pushHideMini} = useContext(PlayerContext);
+  // Экран внутри неактивной (спрятанной) вкладки мини-бар не скрывает.
+  const onActiveTab = useContext(BackHandlerActiveContext);
+  const on = active && onActiveTab;
+  useEffect(() => (on ? pushHideMini() : undefined), [on, pushHideMini]);
 }

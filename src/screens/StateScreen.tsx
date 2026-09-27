@@ -44,6 +44,7 @@ import {useUIStrings} from '../services/uiStrings';
 import {useWebinars} from '../services/webinars';
 import {colors} from '../theme/colors';
 import {fonts, typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const {width: SCREEN_W} = Dimensions.get('window');
 const SECTION_MARGIN = 24;
@@ -96,7 +97,7 @@ function MediaCard({
           <View style={styles.mediaContent}>
             <View style={styles.mediaTextCol}>
               <View style={styles.mediaTextTop}>
-                <Text style={styles.mediaTitle} numberOfLines={2}>
+                <Text style={styles.mediaTitle} numberOfLines={2} android_hyphenationFrequency="full">
                   {title}
                 </Text>
                 {!!description && (
@@ -140,7 +141,7 @@ function RowCard({
       activeOpacity={0.85}
       style={styles.rowCard}
       onPress={onPress}>
-      <Text style={styles.rowTitle} numberOfLines={2}>
+      <Text style={styles.rowTitle} numberOfLines={2} android_hyphenationFrequency="full">
         {title}
       </Text>
       <View style={styles.playBtn}>
@@ -168,6 +169,7 @@ function Section({
 type Props = {state: MindsetState; onBack: () => void};
 
 export function StateScreen({state, onBack}: Props) {
+  useBackHandler(() => onBack());
   const {top, bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
   const t = useUIStrings();

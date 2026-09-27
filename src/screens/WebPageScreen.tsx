@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useRef, useState} from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -12,6 +12,9 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_BACK} from '../assets/icons';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
+import {useHideMiniPlayer} from '../context/PlayerContext';
+import {useUIStrings} from '../services/uiStrings';
 
 type Props = {
   url: string;
@@ -24,6 +27,28 @@ type Props = {
 // открываться внутри приложения.
 export function WebPageScreen({url, title, onBack}: Props) {
   const {top} = useSafeAreaInsets();
+  const t = useUIStrings();
+  const webRef = useRef<WebView>(null);
+  const canGoBack = useRef(false);
+  const [failed, setFailed] = useState(false);
+  const [webKey, setWebKey] = useState(0);
+  // Мини-бар перекрывал бы верх страницы сайта.
+  useHideMiniPlayer();
+
+  // Системное «назад»: сначала история страницы, потом закрытие экрана.
+  useBackHandler(() => {
+    if (canGoBack.current && !failed) {
+      webRef.current?.goBack();
+      return;
+    }
+    onBack();
+  });
+
+  function retry() {
+    setFailed(false);
+    canGoBack.current = false;
+    setWebKey(k => k + 1);
+  }
 
   return (
     <View style={styles.root}>
@@ -39,16 +64,49 @@ export function WebPageScreen({url, title, onBack}: Props) {
         </Text>
         <View style={styles.backBtn} />
       </View>
-      <WebView
-        source={{uri: url}}
-        style={styles.web}
-        startInLoadingState
-        renderLoading={() => (
-          <View style={styles.loading}>
-            <ActivityIndicator color={colors.primary} size="large" />
-          </View>
-        )}
-      />
+      {failed ? (
+        <View style={styles.error}>
+          <Text style={styles.errorText}>
+            {t('web_error', 'Не удалось загрузить страницу. Проверьте подключение к интернету.')}
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={retry}
+            style={styles.retryBtn}>
+            <Text style={styles.retryText}>{t('common_retry', 'Повторить')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <WebView
+          key={webKey}
+          ref={webRef}
+          source={{uri: url}}
+          style={styles.web}
+          startInLoadingState
+          // Кэш: повторное открытие не качает заново статику страницы.
+          cacheEnabled
+          cacheMode="LOAD_DEFAULT"
+          onNavigationStateChange={nav => {
+            canGoBack.current = nav.canGoBack;
+          }}
+          onError={() => setFailed(true)}
+          // На Android onHttpError приходит только для основного документа
+          // страницы, не для картинок и скриптов внутри неё.
+          onHttpError={e => {
+            if (e.nativeEvent.statusCode >= 400) {
+              setFailed(true);
+            }
+          }}
+          // Процесс рендера убит системой — пересоздаём WebView, а не
+          // оставляем мёртвую в дереве.
+          onRenderProcessGone={() => retry()}
+          renderLoading={() => (
+            <View style={styles.loading}>
+              <ActivityIndicator color={colors.primary} size="large" />
+            </View>
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -78,6 +136,29 @@ const styles = StyleSheet.create({
   },
   web: {
     flex: 1,
+  },
+  error: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    backgroundColor: colors.white,
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.primary,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+  },
+  retryText: {
+    ...typography.body,
+    color: colors.white,
   },
   loading: {
     position: 'absolute',

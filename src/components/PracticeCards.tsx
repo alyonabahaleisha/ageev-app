@@ -49,7 +49,7 @@ function PracticeCard({card}: {card: RecommendedCard}) {
           <View style={styles.cardContent}>
             <View style={styles.cardLeft}>
               <View style={styles.cardTop}>
-                <Text style={styles.cardTitle} numberOfLines={2}>
+                <Text style={styles.cardTitle} numberOfLines={2} android_hyphenationFrequency="full">
                   {card.title}
                 </Text>
                 <Text style={styles.cardSubtitle} numberOfLines={2}>

@@ -12,6 +12,7 @@ import {PrimaryButton} from './PrimaryButton';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const {height: SCREEN_H} = Dimensions.get('window');
 // Карточка в макете стоит на y:266 из 844 (411:7142)
@@ -24,6 +25,7 @@ function ModalCard({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  useBackHandler(() => onClose());
   return (
     <View style={styles.overlay}>
       <TouchableOpacity activeOpacity={1} onPress={onClose} style={styles.dim} />

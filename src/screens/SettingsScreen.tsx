@@ -23,6 +23,7 @@ import {
   cancelDailyAffirmationNotifications,
   ensureDailyAffirmationNotifications,
   ensurePracticeReminders,
+  hasNotificationPermission,
 } from '../services/dailyNotifications';
 import {track} from '../services/analytics';
 import {useUIStrings} from '../services/uiStrings';
@@ -34,6 +35,7 @@ import {
   setRegionOverride,
   subscribeRegion,
 } from '../services/mediaRegion';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const SECTION_MARGIN = 24;
 const BTN_SIZE = 34;
@@ -63,6 +65,7 @@ function Chip({
 
 /** Настройки (Figma 448:10501). */
 export function SettingsScreen({onBack}: Props) {
+  useBackHandler(() => onBack());
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
   const {settings, updateSettings} = useAppSettings();
@@ -137,7 +140,14 @@ export function SettingsScreen({onBack}: Props) {
                     updateSettings({dailyAffirmationEnabled: v});
                     track('daily_affirmation_toggle', {enabled: v});
                     if (v) {
-                      ensureDailyAffirmationNotifications();
+                      // Отказ в системном диалоге — тумблер возвращается в
+                      // «выкл», чтобы не показывать включённым то, что не
+                      // будет работать.
+                      ensureDailyAffirmationNotifications(true)
+                        .then(hasNotificationPermission)
+                        .then(ok => {
+                          if (!ok) updateSettings({dailyAffirmationEnabled: false});
+                        });
                     } else {
                       cancelDailyAffirmationNotifications();
                     }
@@ -153,7 +163,12 @@ export function SettingsScreen({onBack}: Props) {
                   onChange={v => {
                     updateSettings({remindersEnabled: v});
                     track('practice_reminders_toggle', {enabled: v});
-                    ensurePracticeReminders();
+                    // Отказ в системном диалоге — тумблер возвращается в «выкл».
+                    ensurePracticeReminders(v)
+                      .then(hasNotificationPermission)
+                      .then(ok => {
+                        if (v && !ok) updateSettings({remindersEnabled: false});
+                      });
                   }}
                 />
               </View>
@@ -192,6 +207,14 @@ export function SettingsScreen({onBack}: Props) {
                   {t('settings_text_size', 'Размер текста')}
                 </Text>
               </View>
+              {/* Масштаб применяется к тексту аффирмаций и плеера — пишем
+                  это прямо, чтобы не казалось, что настройка не работает. */}
+              <Text style={styles.rowHint}>
+                {t(
+                  'settings_text_size_hint',
+                  'Меняет размер текста аффирмаций и описаний практик',
+                )}
+              </Text>
               <View style={styles.chipsRow}>
                 {textSizes.map(ts => (
                   <Chip
@@ -339,6 +362,12 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.white,
     flexShrink: 1,
+  },
+  rowHint: {
+    ...typography.caption,
+    color: colors.white,
+    opacity: 0.7,
+    marginTop: 6,
   },
   labelRow: {
     flexDirection: 'row',

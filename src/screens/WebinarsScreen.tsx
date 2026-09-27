@@ -22,6 +22,7 @@ import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const SECTION_MARGIN = 24;
 // Design 411:8176: full-width 342×170 cards stacked vertically, 12px apart.
@@ -61,7 +62,7 @@ function WebinarCard({item}: {item: Webinar}) {
       <View style={styles.cardContent}>
         <View style={styles.cardLeft}>
           <View style={styles.cardTextBlock}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
+            <Text style={styles.cardTitle} numberOfLines={2} android_hyphenationFrequency="full">
               {item.title}
             </Text>
             <Text style={styles.cardSubtitle} numberOfLines={2}>
@@ -96,6 +97,7 @@ function WebinarCard({item}: {item: Webinar}) {
 }
 
 export function WebinarsScreen({onBack}: Props) {
+  useBackHandler(() => onBack());
   const {top, bottom} = useSafeAreaInsets();
   const {webinars, loading} = useWebinars();
   const t = useUIStrings();

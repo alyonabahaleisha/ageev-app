@@ -13,4 +13,12 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
+    <!-- Нативный сплэш (Android SplashScreen API): логотип с первого кадра
+         вместо пустого синего/чёрного экрана, дальше — JS-сплэш того же вида. -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#22618D</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <item name="postSplashScreenTheme">@style/AppTheme</item>
+    </style>
+
 </resources>

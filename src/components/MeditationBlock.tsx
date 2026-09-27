@@ -44,7 +44,9 @@ function MeditationCard({item}: {item: Meditation}) {
             resizeMode="cover"
           />
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.cardTitle} android_hyphenationFrequency="full">
+              {item.title}
+            </Text>
             <View style={styles.timeRow}>
               <SvgXml xml={ICON_CLOCK} width={18} height={18} />
               <Text style={styles.timeText}>{formatDuration(item.durationSeconds)}</Text>

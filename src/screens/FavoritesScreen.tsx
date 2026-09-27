@@ -38,6 +38,7 @@ import {formatDuration} from '../services/meditations';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {useBackHandler} from '../hooks/useBackHandler';
 
 const SECTION_MARGIN = 24;
 const CARD_GAP = 12;
@@ -203,6 +204,7 @@ function renderCard(
 
 /** Избранное (Figma 448:10703, пустое — 448:10681, списки — 448:10692). */
 export function FavoritesScreen({onBack, onGoPractices, onOpenAffirmation}: Props) {
+  useBackHandler(() => onBack());
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
   const {items, loaded} = useFavorites();
