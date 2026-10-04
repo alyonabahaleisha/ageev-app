@@ -47,15 +47,14 @@ import {AuthProvider} from './src/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {registerOpenFavoritesHandler} from './src/services/appNavigation';
 import {fetchTrackForLink, parseDeepLink} from './src/services/deepLinks';
-import {initRegionOverride} from './src/services/mediaRegion';
+import {initMediaRegion} from './src/services/mediaRegion';
+import {ensureAudioCacheVersion} from './src/services/audioCache';
 import notifee, {EventType} from '@notifee/react-native';
 import {
   ensureDailyAffirmationNotifications,
   ensurePracticeReminders,
 } from './src/services/dailyNotifications';
 import {FavoriteItem} from './src/services/favorites';
-import {uiString} from './src/services/uiStrings';
-import {WebPageScreen} from './src/screens/WebPageScreen';
 import {useDailyStory, useStorySeen} from './src/services/stories';
 import {prefetchImages} from './src/components/RemoteImage';
 import {
@@ -183,8 +182,6 @@ function AppContent() {
   // Аффирмация, открытая по диплинку — пейджер поверх всего.
   const [linkAffirmation, setLinkAffirmation] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [showDonation, setShowDonation] = useState(false);
-  const [showCourses, setShowCourses] = useState(false);
   // Welcome — только при первом запуске (null, пока флаг не прочитан).
   const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
 
@@ -192,9 +189,11 @@ function AppContent() {
     AsyncStorage.getItem(WELCOME_SEEN_KEY)
       .then(v => setShowWelcome(v !== '1'))
       .catch(() => setShowWelcome(false));
-    // Восстанавливаем сохранённый оверрайд региона медиа (QA-тумблер) до того,
-    // как экраны начнут резолвить обложки/аудио.
-    initRegionOverride();
+    // Регион медиа: поднимаем сохранённое состояние и запускаем пробник зеркал
+    // до того, как экраны начнут резолвить обложки/аудио. Заодно одноразово
+    // чистим кэш аудио старой версии (мог содержать битые файлы).
+    initMediaRegion();
+    ensureAudioCacheVersion();
   }, []);
 
   // The «Сохранено» toasts open Избранное through this bridge (the player
@@ -222,8 +221,6 @@ function AppContent() {
         // (паттерн overlay-zindex: экран под оверлеем размонтируется).
         setShowSettings(false);
         setShowFavorites(false);
-        setShowDonation(false);
-        setShowCourses(false);
         setShowSearch(false);
         setShowStories(false);
         setShowClubMap(false);
@@ -378,7 +375,7 @@ function AppContent() {
           <View style={[styles.bottomSpacer, {height: bottom + 110}]} />
         </ScrollView>
         <FixedHeader>
-          <HomeHeader />
+          <HomeHeader onPressProfile={() => handleTabPress(4)} />
         </FixedHeader>
           </>
         )}
@@ -427,8 +424,6 @@ function AppContent() {
           activeTab === 4 &&
           !showFavorites &&
           !showSettings &&
-          !showDonation &&
-          !showCourses &&
           !showAuth &&
           !linkAffirmation
         }>
@@ -436,8 +431,6 @@ function AppContent() {
           onOpenAuth={() => setShowAuth(true)}
           onOpenFavorites={() => setShowFavorites(true)}
           onOpenSettings={() => setShowSettings(true)}
-          onOpenDonation={() => setShowDonation(true)}
-          onOpenCourses={() => setShowCourses(true)}
         />
       </FadeSlot>
 
@@ -506,29 +499,6 @@ function AppContent() {
       {showSettings && (
         <View style={styles.screenSlot}>
           <SettingsScreen onBack={() => setShowSettings(false)} />
-        </View>
-      )}
-
-      {/* Донейшн — сразу страница сайта внутри приложения, без
-          предварительной формы. */}
-      {showDonation && (
-        <View style={styles.screenSlot}>
-          <WebPageScreen
-            url={uiString('profile_donation_url', 'https://mikhail-ageev.ru/donate')}
-            title={uiString('profile_tab_donation', 'Донейшн')}
-            onBack={() => setShowDonation(false)}
-          />
-        </View>
-      )}
-
-      {/* Курсы и события — страница сайта внутри приложения (Профиль). */}
-      {showCourses && (
-        <View style={styles.screenSlot}>
-          <WebPageScreen
-            url={uiString('profile_courses_url', 'https://mikhail-ageev.ru/treningi')}
-            title={uiString('profile_tab_events', 'Курсы и события')}
-            onBack={() => setShowCourses(false)}
-          />
         </View>
       )}
 

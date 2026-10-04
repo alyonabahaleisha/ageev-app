@@ -6,15 +6,31 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import TrackPlayer, {Capability, State} from 'react-native-track-player';
-import {downloadAudio, getCachedAudioUrl} from '../services/audioCache';
+import TrackPlayer, {
+  Capability,
+  Event,
+  State,
+  useTrackPlayerEvents,
+} from 'react-native-track-player';
+import {
+  downloadAudio,
+  getCachedAudioUrl,
+  removeCachedAudio,
+} from '../services/audioCache';
 import {
   getPlaybackPosition,
   savePlaybackPosition,
 } from '../services/playbackPositions';
 import {uiString} from '../services/uiStrings';
 import {track as trackEvent} from '../services/analytics';
-import {resolveMediaUrl} from '../services/mediaRegion';
+import {
+  Region,
+  getRegion,
+  otherRegion,
+  regionOfUrl,
+  reportMirrorFailure,
+  resolveMediaUrl,
+} from '../services/mediaRegion';
 import {BackHandlerActiveContext} from '../hooks/useBackHandler';
 
 export type PlayerTrack = {
@@ -113,6 +129,122 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
   // Актуальный трек для togglePlay (колбэк стабилен, state в замыкании устарел бы).
   const trackRef = useRef<PlayerTrack | null>(null);
 
+  // Что сейчас загружено в плеер — для восстановления после PlaybackError:
+  // битый кэш → удалить и стримить; упало зеркало → другое зеркало (один раз).
+  type LoadAttempt = {
+    track: PlayerTrack;
+    url: string;
+    fromCache: boolean;
+    retriedMirror: boolean;
+  };
+  const loadRef = useRef<LoadAttempt | null>(null);
+  const recoveringRef = useRef(false);
+
+  // Загружает трек в плеер: кэш (если разрешён и есть) либо стрим с зеркала
+  // `region` (по умолчанию — текущего), докачивая копию в кэш в фоне.
+  const startTrack = useCallback(
+    async (
+      t: PlayerTrack,
+      opts: {fromCache: boolean; retriedMirror: boolean; region?: Region},
+    ) => {
+      // Медиа-URL приводим к зеркалу региона перед стримом и загрузкой.
+      const streamUrl = resolveMediaUrl(t.audioUrl, opts.region) ?? t.audioUrl;
+      const cachedUrl = opts.fromCache
+        ? await getCachedAudioUrl(t.id, streamUrl)
+        : null;
+      loadRef.current = {
+        track: t,
+        url: cachedUrl ?? streamUrl,
+        fromCache: !!cachedUrl,
+        retriedMirror: opts.retriedMirror,
+      };
+
+      await TrackPlayer.reset();
+      await TrackPlayer.add({
+        id: t.id,
+        url: cachedUrl ?? streamUrl,
+        title: t.title,
+        artist: t.artist || uiString('player_default_artist', 'Михаил Агеев'),
+        artwork: resolveMediaUrl(t.coverUrl, opts.region) ?? t.coverUrl,
+        duration: t.durationSeconds,
+      });
+
+      // Pick up where the user last left this track (persists across
+      // restarts). Positions near the end are not saved, so a finished track
+      // starts over.
+      const savedPos = await getPlaybackPosition(t.id);
+      if (savedPos > 0) {
+        await TrackPlayer.seekTo(savedPos);
+      }
+
+      await TrackPlayer.play();
+
+      if (!cachedUrl) {
+        downloadAudio(t.id, streamUrl).then(outcome => {
+          // Зеркало не отдало файл целиком/корректно — штрафуем его, чтобы
+          // следующие треки сразу пошли с другого; пробник перепроверит.
+          if (
+            outcome === 'http_error' ||
+            outcome === 'network_error' ||
+            outcome === 'invalid_content'
+          ) {
+            reportMirrorFailure(regionOfUrl(streamUrl));
+          }
+        });
+      }
+    },
+    [],
+  );
+
+  // Ошибка воспроизведения: восстанавливаемся без участия пользователя.
+  useTrackPlayerEvents([Event.PlaybackError], async e => {
+    const attempt = loadRef.current;
+    if (!attempt || recoveringRef.current) {
+      return;
+    }
+    recoveringRef.current = true;
+    try {
+      console.warn('[Player] playback error:', e, 'url:', attempt.url);
+      if (attempt.fromCache) {
+        // Локальный файл не декодируется (битый/обрезанный/HTML) — выкидываем
+        // из кэша и играем стримом; кэш перезапишется валидным файлом.
+        await removeCachedAudio(attempt.track.id, attempt.url);
+        trackEvent('practice_recover', {
+          track_id: attempt.track.id,
+          reason: 'bad_cache',
+        });
+        await startTrack(attempt.track, {fromCache: false, retriedMirror: false});
+        return;
+      }
+      if (!attempt.retriedMirror) {
+        const failed = regionOfUrl(attempt.url) ?? getRegion();
+        const next = reportMirrorFailure(failed);
+        const region = next !== failed ? next : otherRegion(failed);
+        trackEvent('practice_recover', {
+          track_id: attempt.track.id,
+          reason: 'mirror_switch',
+          from: failed,
+          to: region,
+        });
+        await startTrack(attempt.track, {
+          fromCache: false,
+          retriedMirror: true,
+          region,
+        });
+        return;
+      }
+      // Оба зеркала не отдали трек: сбрасываем плеер, чтобы следующий тап по
+      // Play загрузил трек заново (а не дёргал play() у битого элемента).
+      trackEvent('practice_error', {track_id: attempt.track.id});
+      loadRef.current = null;
+      await TrackPlayer.reset().catch(() => {});
+    } catch (err) {
+      console.warn('[Player] recovery failed:', err);
+    } finally {
+      recoveringRef.current = false;
+    }
+  });
+
   // Плеер (и foreground-сервис MusicService) НЕ поднимается при запуске
   // приложения: Google Play требует mediaPlayback-сервис только при реальном
   // воспроизведении, а на Samsung система гасила простаивающий сервис.
@@ -148,39 +280,11 @@ export function PlayerProvider({children}: {children: React.ReactNode}) {
         await savePlaybackPosition(String(active.id), position, duration);
       }
 
-      // Play the cached file when we have one; otherwise stream and download
-      // a local copy in the background for next time. Медиа-URL приводим к
-      // источнику региона (РФ-зеркало / Firebase) перед стримом и загрузкой.
-      const streamUrl = resolveMediaUrl(t.audioUrl) ?? t.audioUrl;
-      const cachedUrl = await getCachedAudioUrl(t.id, streamUrl);
-
-      await TrackPlayer.reset();
-      await TrackPlayer.add({
-        id: t.id,
-        url: cachedUrl ?? streamUrl,
-        title: t.title,
-        artist: t.artist || uiString('player_default_artist', 'Михаил Агеев'),
-        artwork: resolveMediaUrl(t.coverUrl) ?? t.coverUrl,
-        duration: t.durationSeconds,
-      });
-
-      // Pick up where the user last left this track (persists across
-      // restarts). Positions near the end are not saved, so a finished track
-      // starts over.
-      const savedPos = await getPlaybackPosition(t.id);
-      if (savedPos > 0) {
-        await TrackPlayer.seekTo(savedPos);
-      }
-
-      await TrackPlayer.play();
-
-      if (!cachedUrl) {
-        downloadAudio(t.id, streamUrl);
-      }
+      await startTrack(t, {fromCache: true, retriedMirror: false});
     } catch (e) {
       console.warn('[Player] error:', e);
     }
-  }, []);
+  }, [startTrack]);
 
   const openPlayer = useCallback(
     async (t: PlayerTrack, opts?: {autoplay?: boolean}) => {

@@ -35,8 +35,6 @@ type Props = {
   onOpenAuth: () => void;
   onOpenFavorites: () => void;
   onOpenSettings: () => void;
-  onOpenDonation: () => void;
-  onOpenCourses: () => void;
 };
 
 /** Профиль (Figma 411:7252) и гостевой режим (411:7181). */
@@ -44,8 +42,6 @@ export function ProfileScreen({
   onOpenAuth,
   onOpenFavorites,
   onOpenSettings,
-  onOpenDonation,
-  onOpenCourses,
 }: Props) {
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
@@ -69,15 +65,19 @@ export function ProfileScreen({
       locked: !loggedIn,
       onPress: loggedIn ? onOpenFavorites : onOpenAuth,
     },
+    // «Курсы и события» и «Донейшн» — страницы сайта; открываются в системном
+    // браузере, а не во встроенном WebView (решение по продукту, 2026-10-04).
     {
       key: 'events',
       label: t('profile_tab_events', 'Курсы и события'),
-      onPress: onOpenCourses,
+      onPress: () =>
+        openUrl(t('profile_courses_url', 'https://mikhail-ageev.ru/treningi')),
     },
     {
       key: 'donation',
       label: t('profile_tab_donation', 'Донейшн'),
-      onPress: onOpenDonation,
+      onPress: () =>
+        openUrl(t('profile_donation_url', 'https://mikhail-ageev.ru/donate')),
     },
     {
       key: 'settings',

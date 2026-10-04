@@ -21,9 +21,11 @@ const ICON_SIZE = 24;
 
 type Props = {
   name?: string;
+  /** Тап по аватару/приветствию — открыть вкладку «Профиль» (как в нижнем меню). */
+  onPressProfile?: () => void;
 };
 
-export function HomeHeader({name}: Props) {
+export function HomeHeader({name, onPressProfile}: Props) {
   const t = useUIStrings();
   const {openSearch} = useSearch();
   const {user} = useAuth();
@@ -33,8 +35,12 @@ export function HomeHeader({name}: Props) {
   const welcome = t('home_header_welcome', 'Добро пожаловать,');
   return (
     <View style={styles.container}>
-      {/* Left: avatar + greeting */}
-      <View style={styles.greeting}>
+      {/* Left: avatar + greeting — ведёт в профиль, как нижняя вкладка */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={styles.greeting}
+        onPress={onPressProfile}
+        disabled={!onPressProfile}>
         {/* White glow layer → dark shadow layer → solid avatar.
             Фото приходит из Google/Apple-аккаунта (photoURL). */}
         <View style={styles.cardGlow}>
@@ -62,7 +68,7 @@ export function HomeHeader({name}: Props) {
             </Text>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Right: frosted circle — white glow wrapper keeps radius small so shape stays circular */}
       <View style={styles.searchGlow}>

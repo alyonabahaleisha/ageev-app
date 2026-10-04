@@ -251,7 +251,7 @@ export function SettingsScreen({onBack}: Props) {
                 {(
                   [
                     ['ru', '🇷🇺 Россия (зеркало)'],
-                    ['world', '🌍 Мир (Firebase)'],
+                    ['world', '🌍 Мир (Cloudflare R2)'],
                   ] as const
                 ).map(([value, label]) => (
                   <Chip

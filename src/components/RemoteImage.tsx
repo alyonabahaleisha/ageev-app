@@ -1,6 +1,19 @@
-import React from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import FastImage, {FastImageProps, Source} from '@d11/react-native-fast-image';
-import {resolveMediaUrl} from '../services/mediaRegion';
+import {
+  getRegion,
+  probeMirrors,
+  regionOfUrl,
+  resolveMediaUrl,
+  subscribeRegion,
+} from '../services/mediaRegion';
+
+/** Текущее зеркало медиа; перерисовывает компонент при переключении. */
+export function useMediaRegion() {
+  const [region, setRegion] = useState(getRegion());
+  useEffect(() => subscribeRegion(() => setRegion(getRegion())), []);
+  return region;
+}
 
 /**
  * Thin wrapper over FastImage for remote cover art.
@@ -13,6 +26,22 @@ import {resolveMediaUrl} from '../services/mediaRegion';
  */
 export function RemoteImage(props: FastImageProps) {
   const source = props.source as Source;
+  // Подписка на регион: при переключении зеркала обложки перезапрашиваются
+  // с нового хоста (uri меняется → FastImage грузит заново).
+  useMediaRegion();
+  const uri = resolveMediaUrl(source?.uri) ?? source?.uri;
+  const {onError} = props;
+  const handleError = useCallback<NonNullable<FastImageProps['onError']>>(
+    (...args) => {
+      // Обложка с зеркала не загрузилась — повод перепроверить зеркала. Само
+      // зеркало не штрафуем: одиночный 404 не должен переключать все медиа.
+      if (regionOfUrl(uri)) {
+        probeMirrors({force: true}).catch(() => {});
+      }
+      onError?.(...args);
+    },
+    [uri, onError],
+  );
   return (
     <FastImage
       {...props}
@@ -20,8 +49,9 @@ export function RemoteImage(props: FastImageProps) {
         cache: FastImage.cacheControl.immutable,
         priority: FastImage.priority.normal,
         ...source,
-        uri: resolveMediaUrl(source?.uri) ?? source?.uri,
+        uri,
       }}
+      onError={handleError}
     />
   );
 }
