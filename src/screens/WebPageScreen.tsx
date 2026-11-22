@@ -2,10 +2,10 @@ import React, {useRef, useState} from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from '../components/Text';
 import {WebView} from 'react-native-webview';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';

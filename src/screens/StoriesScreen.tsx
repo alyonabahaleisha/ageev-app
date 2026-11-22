@@ -29,15 +29,32 @@ type Props = {
   onClose: () => void;
   // Reel 4 "Все практики" → open the Практики tab (also dismisses the viewer).
   onOpenPractices: () => void;
+  /** Открыть сразу на слайде с этим key (из пуша с аффирмацией) и не
+   *  запускать автопереход, пока пользователь сам не тапнет — чтобы можно
+   *  было спокойно дочитать и проговорить. */
+  openAt?: string;
 };
 
 // Instagram-style stories viewer: auto-advancing segments up top, tap the right
 // side to skip forward / left to go back, press-and-hold to pause.
-export function StoriesScreen({content, onClose, onOpenPractices}: Props) {
+export function StoriesScreen({
+  content,
+  onClose,
+  onOpenPractices,
+  openAt,
+}: Props) {
   useBackHandler(() => onClose());
   const {top} = useSafeAreaInsets();
   const {openPlayer} = usePlayer();
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() =>
+    Math.max(
+      0,
+      STORY_SLIDES.findIndex(s => s.key === openAt),
+    ),
+  );
+  // Пока true — таймер стоит (открыли конкретный слайд по ссылке). Любой
+  // жест снимает удержание.
+  const holdRef = useRef(!!openAt);
   // Slides whose background image has finished decoding. A slide is only
   // revealed (and its timer started) once it's in here, so it appears fully
   // formed instead of painting in parts.
@@ -112,7 +129,7 @@ export function StoriesScreen({content, onClose, onOpenPractices}: Props) {
   // that slide's image is decoded, so the progress bar doesn't run ahead of a
   // slide that hasn't appeared yet.
   useEffect(() => {
-    if (!ready.has(index)) {
+    if (!ready.has(index) || holdRef.current) {
       progress.setValue(0); // hold the segment empty until the media is ready
       return;
     }
@@ -147,6 +164,7 @@ export function StoriesScreen({content, onClose, onOpenPractices}: Props) {
     ) => {
       const held = Date.now() - pressStart.current;
       const {dx, dy} = g;
+      holdRef.current = false;
 
       // Swipe: horizontal travel beyond the threshold, more horizontal than
       // vertical. Swipe left → next, swipe right → previous.

@@ -17,6 +17,8 @@ buildscript {
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
         // Firebase Analytics (@react-native-firebase)
         classpath("com.google.gms:google-services:4.4.2")
+        // Firebase Crashlytics: загрузка mapping-файлов R8 при release-сборке
+        classpath("com.google.firebase:firebase-crashlytics-gradle:3.0.3")
     }
 }
 

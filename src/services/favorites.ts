@@ -1,15 +1,18 @@
 import {useEffect, useState} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {onAuthStateChanged} from 'firebase/auth';
-import {auth} from '../lib/firebase';
 import {track} from './analytics';
 
 // Избранное (Figma 448:10703): медитации, вебинары, духовные завтраки и
-// аффирмации, которые пользователь отметил сердечком. Хранится локально,
-// отдельным списком на аккаунт; лайки гостя переезжают в аккаунт при первом
-// входе.
+// аффирмации, которые пользователь отметил сердечком. Хранится ТОЛЬКО на
+// устройстве (AsyncStorage): аккаунтов в приложении больше нет. Списки,
+// сохранённые раньше под аккаунтами (`favorites_v1:<uid>`) и гостем,
+// один раз сливаются в общий локальный список при первом запуске.
 
-export type FavoriteKind = 'meditation' | 'webinar' | 'breakfast' | 'affirmation';
+export type FavoriteKind =
+  | 'meditation'
+  | 'webinar'
+  | 'breakfast'
+  | 'affirmation';
 
 export type FavoriteItem = {
   kind: FavoriteKind;
@@ -24,8 +27,8 @@ export type FavoriteItem = {
 };
 
 const KEY_PREFIX = 'favorites_v1:';
+const KEY = KEY_PREFIX + 'local';
 
-let scope = 'guest';
 let items: FavoriteItem[] = [];
 let loaded = false;
 const listeners = new Set<() => void>();
@@ -34,9 +37,9 @@ function emit() {
   listeners.forEach(l => l());
 }
 
-async function readScope(s: string): Promise<FavoriteItem[]> {
+async function readKey(key: string): Promise<FavoriteItem[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEY_PREFIX + s);
+    const raw = await AsyncStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -46,32 +49,40 @@ async function readScope(s: string): Promise<FavoriteItem[]> {
 
 const itemKey = (i: {kind: FavoriteKind; id: string}) => `${i.kind}:${i.id}`;
 
-async function switchScope(next: string) {
-  scope = next;
-  loaded = false;
-  let list = await readScope(next);
-  if (next !== 'guest') {
-    const guest = await readScope('guest');
-    if (guest.length) {
-      const seen = new Set(list.map(itemKey));
-      list = [...guest.filter(i => !seen.has(itemKey(i))), ...list];
-      AsyncStorage.removeItem(KEY_PREFIX + 'guest').catch(() => {});
-      AsyncStorage.setItem(KEY_PREFIX + next, JSON.stringify(list)).catch(
-        () => {},
-      );
-    }
-  }
-  // Пока читали хранилище, пользователь мог выйти/войти — не затираем.
-  if (scope === next) {
-    items = list;
-    loaded = true;
-    emit();
-  }
+function persist() {
+  AsyncStorage.setItem(KEY, JSON.stringify(items)).catch(() => {});
 }
 
-onAuthStateChanged(auth, u => {
-  switchScope(u?.uid ?? 'guest');
-});
+async function load() {
+  let list = await readKey(KEY);
+  // Перенос из старых списков (гость и аккаунты) — один раз.
+  try {
+    const legacy = (await AsyncStorage.getAllKeys()).filter(
+      k => k.startsWith(KEY_PREFIX) && k !== KEY,
+    );
+    if (legacy.length) {
+      const seen = new Set(list.map(itemKey));
+      for (const k of legacy) {
+        for (const i of await readKey(k)) {
+          if (!seen.has(itemKey(i))) {
+            seen.add(itemKey(i));
+            list.push(i);
+          }
+        }
+      }
+      list.sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0));
+      await AsyncStorage.setItem(KEY, JSON.stringify(list));
+      await Promise.all(legacy.map(k => AsyncStorage.removeItem(k)));
+    }
+  } catch {
+    // не удалось прочитать старые ключи — работаем с тем, что есть
+  }
+  items = list;
+  loaded = true;
+  emit();
+}
+
+load();
 
 export function isFavorite(kind: FavoriteKind, id: string): boolean {
   return items.some(i => i.kind === kind && i.id === id);
@@ -85,9 +96,7 @@ export function toggleFavorite(item: Omit<FavoriteItem, 'addedAt'>) {
     items = [{...item, addedAt: Date.now()}, ...items];
     track('favorite_add', {content_kind: item.kind, content_id: item.id});
   }
-  AsyncStorage.setItem(KEY_PREFIX + scope, JSON.stringify(items)).catch(
-    () => {},
-  );
+  persist();
   emit();
 }
 

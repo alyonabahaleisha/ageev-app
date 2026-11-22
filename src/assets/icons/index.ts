@@ -207,3 +207,9 @@ export const ICON_TEXT_SIZE = `<svg width="19" height="11" viewBox="0 0 19 11" f
 export const ICON_PLAY_POLYGON = `<svg width="18" height="21" viewBox="0 0 18 21" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path opacity="0.88" d="M18 10.3906L9.2855e-07 20.7829L1.83707e-06 -0.00168021L18 10.3906Z" fill="white"/>
 </svg>`;
+
+/** Маркер геопозиции («Клубы рядом со мной»), в стиле line-иконок 1.5px. */
+export const ICON_LOCATION = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 21C12 21 5 14.9 5 10C5 6.13 8.13 3 12 3C15.87 3 19 6.13 19 10C19 14.9 12 21 12 21Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12 12.5C13.38 12.5 14.5 11.38 14.5 10C14.5 8.62 13.38 7.5 12 7.5C10.62 7.5 9.5 8.62 9.5 10C9.5 11.38 10.62 12.5 12 12.5Z" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;

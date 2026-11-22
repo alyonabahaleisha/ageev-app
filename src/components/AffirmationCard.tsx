@@ -2,10 +2,10 @@ import React from 'react';
 import {
   ImageBackground,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {ICON_AFFIRMATION} from '../assets/icons';
 import LinearGradient from './LinearGradient';

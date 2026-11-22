@@ -3,10 +3,10 @@ import {
   Image,
   Platform,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from './Text';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';

@@ -3,10 +3,10 @@ import {
   Dimensions,
   Platform,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from './Text';
 import {BlurView} from '@react-native-community/blur';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';

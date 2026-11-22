@@ -7,7 +7,10 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import TrackPlayer from 'react-native-track-player';
 import {PlaybackService} from './src/services/playbackService';
 import {track, trackScreen} from './src/services/analytics';
@@ -17,7 +20,10 @@ import {GradientBackground} from './src/components/GradientBackground';
 import {SplashScreen} from './src/components/SplashScreen';
 import {BottomNavBar} from './src/components/BottomNavBar';
 import {HomeHeader} from './src/components/HomeHeader';
-import {FixedHeader, useHeaderScrollPadding} from './src/components/FixedHeader';
+import {
+  FixedHeader,
+  useHeaderScrollPadding,
+} from './src/components/FixedHeader';
 import {MiniPlayer} from './src/components/MiniPlayer';
 import {AboutAppBlock} from './src/components/AboutAppBlock';
 import {AffirmationCard} from './src/components/AffirmationCard';
@@ -41,13 +47,13 @@ import {SearchContext} from './src/context/SearchContext';
 import {ProfileScreen} from './src/screens/ProfileScreen';
 import {FavoritesScreen} from './src/screens/FavoritesScreen';
 import {SettingsScreen} from './src/screens/SettingsScreen';
-import {AuthScreen} from './src/screens/AuthScreen';
 import {WelcomeScreen} from './src/screens/WelcomeScreen';
-import {AuthProvider} from './src/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {registerOpenFavoritesHandler} from './src/services/appNavigation';
 import {fetchTrackForLink, parseDeepLink} from './src/services/deepLinks';
 import {initMediaRegion} from './src/services/mediaRegion';
+import {appendLog, captureConsole} from './src/services/logBuffer';
+import {describeDevice} from './src/services/diagnosticsReport';
 import {ensureAudioCacheVersion} from './src/services/audioCache';
 import notifee, {EventType} from '@notifee/react-native';
 import {
@@ -67,13 +73,15 @@ TrackPlayer.registerPlaybackService(() => PlaybackService);
 function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <AuthProvider>
-        <PlayerProvider>
-          <AppContent />
-          <PlayerScreen />
-        </PlayerProvider>
-      </AuthProvider>
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+      <PlayerProvider>
+        <AppContent />
+        <PlayerScreen />
+      </PlayerProvider>
       <SplashScreen />
     </SafeAreaProvider>
   );
@@ -93,7 +101,13 @@ const FADE_OUT_MS = 150;
 /** Слот вкладки с плавным появлением/исчезновением: содержимое остаётся
  *  смонтированным на время фейд-аута, потом размонтируется (прежняя
  *  семантика «скрыт — значит размонтирован» сохраняется). */
-function FadeSlot({shown, children}: {shown: boolean; children: React.ReactNode}) {
+function FadeSlot({
+  shown,
+  children,
+}: {
+  shown: boolean;
+  children: React.ReactNode;
+}) {
   const [mounted, setMounted] = useState(shown);
   const op = useRef(new Animated.Value(shown ? 1 : 0)).current;
   useEffect(() => {
@@ -163,13 +177,14 @@ function AppContent() {
   // закрытия — повторные открытия мгновенны.
   const [mapPreheated, setMapPreheated] = useState(false);
   const [showStories, setShowStories] = useState(false);
+  // Слайд, на котором открыть сторис (ageev://story/<дата> из пуша).
+  const [storiesOpenAt, setStoriesOpenAt] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   // Quick-category jump from the search screen into a Практики sub-screen.
   const [practicesFormat, setPracticesFormat] = useState<{
     id: SearchCategory;
     n: number;
   } | null>(null);
-  const [showAuth, setShowAuth] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   // Аффирмация, открытая из «Избранного» — пейджер поверх списка.
   const [favAffirmation, setFavAffirmation] = useState<FavoriteItem | null>(
@@ -192,6 +207,8 @@ function AppContent() {
     // Регион медиа: поднимаем сохранённое состояние и запускаем пробник зеркал
     // до того, как экраны начнут резолвить обложки/аудио. Заодно одноразово
     // чистим кэш аудио старой версии (мог содержать битые файлы).
+    captureConsole();
+    appendLog(`app start · ${describeDevice()}`);
     initMediaRegion();
     ensureAudioCacheVersion();
   }, []);
@@ -215,7 +232,7 @@ function AppContent() {
       const link = url ? parseDeepLink(url) : null;
       if (!link) return;
       track('deep_link_open', {link_type: link.type, link_id: link.id});
-      if (link.type === 'affirmation') {
+      if (link.type === 'affirmation' || link.type === 'story') {
         // Диплинк ведёт на конкретный экран: закрываем открытые оверлеи —
         // их fixed-заголовки (zIndex 10) иначе всплывают над пейджером
         // (паттерн overlay-zindex: экран под оверлеем размонтируется).
@@ -226,10 +243,17 @@ function AppContent() {
         setShowClubMap(false);
         setShowSchool(false);
         setShowAffirmations(false);
-        setShowAuth(false);
         setSelectedState(null);
         setFavAffirmation(null);
-        setLinkAffirmation(link.id);
+        if (link.type === 'story') {
+          // Пуш со сторисной аффирмацией: сторис дня на слайде «Аффирмация
+          // дня» (контент — сегодняшний; пуш прошлых дней тоже ведёт сюда).
+          setLinkAffirmation(null);
+          setStoriesOpenAt('affirmation');
+          setShowStories(true);
+        } else {
+          setLinkAffirmation(link.id);
+        }
       } else {
         fetchTrackForLink(link)
           .then(track => {
@@ -238,7 +262,9 @@ function AppContent() {
           .catch(() => {});
       }
     };
-    Linking.getInitialURL().then(handle).catch(() => {});
+    Linking.getInitialURL()
+      .then(handle)
+      .catch(() => {});
     const sub = Linking.addEventListener('url', e => handle(e.url));
 
     // Ежедневный пуш с аффирмацией: перепланировать на месяц вперёд и
@@ -266,10 +292,9 @@ function AppContent() {
     };
   }, [openPlayer]);
 
-  function dismissWelcome(openAuth: boolean) {
+  function dismissWelcome() {
     setShowWelcome(false);
     AsyncStorage.setItem(WELCOME_SEEN_KEY, '1').catch(() => {});
-    if (openAuth) setShowAuth(true);
   }
 
   // Системное «назад» (Android): оверлеи и вложенные экраны подписываются
@@ -318,265 +343,258 @@ function AppContent() {
 
   return (
     <SearchContext.Provider value={{openSearch: () => setShowSearch(true)}}>
-    <GradientBackground>
-      <Animated.View
-        style={[styles.screenSlot, {opacity: opacity0}]}
-        pointerEvents={activeTab !== 0 ? 'none' : 'auto'}>
-        {activeTab === 0 && (
-          <>
-        <ScrollView
-          ref={homeScrollRef}
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.content,
-            {paddingTop: scrollPad},
-          ]}
-          showsVerticalScrollIndicator={false}>
-          <View style={styles.aboutSection}>
-            <AboutAppBlock
-              ringVisible={!storySeenToday}
-              onPressCircle={() => {
-                markStorySeen();
-                setShowStories(true);
-              }}
-            />
-          </View>
-          <View style={styles.practiceSection}>
-            <PracticeCards />
-          </View>
-          <View style={styles.angelSection}>
-            <AngelHelper onOpenState={setSelectedState} />
-          </View>
-          <View style={styles.cardSection}>
-            <AffirmationCard
-              onPress={() => {
-                setShowAffirmations(true);
-                trackScreen('affirmations');
-              }}
-            />
-          </View>
-          <View style={styles.meditationSection}>
-            <MeditationBlock />
-          </View>
-          <View style={styles.webinarSection}>
-            <WebinarBlock />
-          </View>
-          <View style={styles.schoolSection}>
-            <SchoolCard
-              onPress={() => {
-                setShowSchool(true);
-                trackScreen('school');
-              }}
-            />
-          </View>
-          <View style={styles.clubSection}>
-            <ClubSection onPress={() => handleTabPress(3)} />
-          </View>
-          <View style={[styles.bottomSpacer, {height: bottom + 110}]} />
-        </ScrollView>
-        <FixedHeader>
-          <HomeHeader onPressProfile={() => handleTabPress(4)} />
-        </FixedHeader>
-          </>
-        )}
-      </Animated.View>
+      <GradientBackground>
+        <Animated.View
+          style={[styles.screenSlot, {opacity: opacity0}]}
+          pointerEvents={activeTab !== 0 ? 'none' : 'auto'}>
+          {activeTab === 0 && (
+            <>
+              <ScrollView
+                ref={homeScrollRef}
+                style={styles.scroll}
+                contentContainerStyle={[
+                  styles.content,
+                  {paddingTop: scrollPad},
+                ]}
+                showsVerticalScrollIndicator={false}>
+                <View style={styles.aboutSection}>
+                  <AboutAppBlock
+                    ringVisible={!storySeenToday}
+                    onPressCircle={() => {
+                      markStorySeen();
+                      setShowStories(true);
+                    }}
+                  />
+                </View>
+                <View style={styles.practiceSection}>
+                  <PracticeCards />
+                </View>
+                <View style={styles.angelSection}>
+                  <AngelHelper onOpenState={setSelectedState} />
+                </View>
+                <View style={styles.cardSection}>
+                  <AffirmationCard
+                    onPress={() => {
+                      setShowAffirmations(true);
+                      trackScreen('affirmations');
+                    }}
+                  />
+                </View>
+                <View style={styles.meditationSection}>
+                  <MeditationBlock />
+                </View>
+                <View style={styles.webinarSection}>
+                  <WebinarBlock />
+                </View>
+                <View style={styles.schoolSection}>
+                  <SchoolCard
+                    onPress={() => {
+                      setShowSchool(true);
+                      trackScreen('school');
+                    }}
+                  />
+                </View>
+                <View style={styles.clubSection}>
+                  <ClubSection onPress={() => handleTabPress(3)} />
+                </View>
+                <View style={[styles.bottomSpacer, {height: bottom + 110}]} />
+              </ScrollView>
+              <FixedHeader>
+                <HomeHeader onPressProfile={() => handleTabPress(4)} />
+              </FixedHeader>
+            </>
+          )}
+        </Animated.View>
 
-      <Animated.View
-        style={[styles.screenSlot, {opacity: opacity1}]}
-        pointerEvents={activeTab !== 1 ? 'none' : 'auto'}>
-        {activeTab === 1 && (
-          <BackHandlerActiveContext.Provider value={activeTab === 1}>
-            <ThinkingScreen
-              resetSignal={thinkingReset}
-              onOpenState={setSelectedState}
-            />
-          </BackHandlerActiveContext.Provider>
-        )}
-      </Animated.View>
+        <Animated.View
+          style={[styles.screenSlot, {opacity: opacity1}]}
+          pointerEvents={activeTab !== 1 ? 'none' : 'auto'}>
+          {activeTab === 1 && (
+            <BackHandlerActiveContext.Provider value={activeTab === 1}>
+              <ThinkingScreen
+                resetSignal={thinkingReset}
+                onOpenState={setSelectedState}
+              />
+            </BackHandlerActiveContext.Provider>
+          )}
+        </Animated.View>
 
-      <Animated.View
-        style={[styles.screenSlot, {opacity: opacity2}]}
-        pointerEvents={activeTab !== 2 ? 'none' : 'auto'}>
-        {activeTab === 2 && (
-          <BackHandlerActiveContext.Provider value={activeTab === 2}>
-            <PracticesScreen
-              resetSignal={practicesReset}
-              formatSignal={practicesFormat}
-            />
-          </BackHandlerActiveContext.Provider>
-        )}
-      </Animated.View>
+        <Animated.View
+          style={[styles.screenSlot, {opacity: opacity2}]}
+          pointerEvents={activeTab !== 2 ? 'none' : 'auto'}>
+          {activeTab === 2 && (
+            <BackHandlerActiveContext.Provider value={activeTab === 2}>
+              <PracticesScreen
+                resetSignal={practicesReset}
+                formatSignal={practicesFormat}
+              />
+            </BackHandlerActiveContext.Provider>
+          )}
+        </Animated.View>
 
-      {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is
+        {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is
           open so its header can't flash over the map during the WebView load. */}
-      <FadeSlot shown={activeTab === 3 && !showClubMap && !linkAffirmation}>
-        <ClubScreen
-          onOpenMap={() => setShowClubMap(true)}
-          onClose={() => handleTabPress(0)}
-        />
-      </FadeSlot>
+        <FadeSlot shown={activeTab === 3 && !showClubMap && !linkAffirmation}>
+          <ClubScreen
+            onOpenMap={() => setShowClubMap(true)}
+            onClose={() => handleTabPress(0)}
+          />
+        </FadeSlot>
 
-      {/* Profile tab (index 4) — guest and logged-in variants live inside.
-          Unmounted while Избранное/Настройки/Auth are open: its fixed header
+        {/* Profile tab (index 4).
+          Unmounted while Избранное/Настройки are open: its fixed header
           has zIndex 10 and would float above the overlay otherwise. */}
-      <FadeSlot
-        shown={
-          activeTab === 4 &&
-          !showFavorites &&
-          !showSettings &&
-          !showAuth &&
-          !linkAffirmation
-        }>
-        <ProfileScreen
-          onOpenAuth={() => setShowAuth(true)}
-          onOpenFavorites={() => setShowFavorites(true)}
-          onOpenSettings={() => setShowSettings(true)}
-        />
-      </FadeSlot>
+        <FadeSlot
+          shown={
+            activeTab === 4 &&
+            !showFavorites &&
+            !showSettings &&
+            !showSearch &&
+            !linkAffirmation
+          }>
+          <ProfileScreen
+            onOpenFavorites={() => setShowFavorites(true)}
+            onOpenSettings={() => setShowSettings(true)}
+          />
+        </FadeSlot>
 
-      {/* State detail — a top-level overlay so tapping a state card (from the
+        {/* State detail — a top-level overlay so tapping a state card (from the
           home picker or the Мышление tab) opens it directly, without a tab jump.
           Unmounted while Избранное is open (тост «Сохранено» ведёт туда) — its
           fixed header has zIndex 10 and would float above the overlay. */}
-      {selectedState && !showFavorites && (
-        <View style={styles.screenSlot}>
-          <StateScreen
-            state={selectedState}
-            onBack={() => setSelectedState(null)}
-          />
-        </View>
-      )}
+        {selectedState && !showFavorites && (
+          <View style={styles.screenSlot}>
+            <StateScreen
+              state={selectedState}
+              onBack={() => setSelectedState(null)}
+            />
+          </View>
+        )}
 
-      {showAffirmations && (
-        <View style={styles.screenSlot}>
-          <AffirmationsScreen onBack={() => setShowAffirmations(false)} />
-        </View>
-      )}
+        {showAffirmations && (
+          <View style={styles.screenSlot}>
+            <AffirmationsScreen onBack={() => setShowAffirmations(false)} />
+          </View>
+        )}
 
-      {showSchool && (
-        <View style={styles.screenSlot}>
-          <SchoolScreen onBack={() => setShowSchool(false)} />
-        </View>
-      )}
+        {showSchool && (
+          <View style={styles.screenSlot}>
+            <SchoolScreen onBack={() => setShowSchool(false)} />
+          </View>
+        )}
 
-      <BottomNavBar activeIndex={activeTab} onTabPress={handleTabPress} />
+        <BottomNavBar activeIndex={activeTab} onTabPress={handleTabPress} />
 
-
-      {/* Full-screen clubs map opens from the Club tab, above the nav bar.
+        {/* Full-screen clubs map opens from the Club tab, above the nav bar.
           Смонтирована скрыто с момента захода на вкладку «Клуб» (прогрев). */}
-      {(mapPreheated || showClubMap) && (
-        <View
-          style={[styles.screenSlot, !showClubMap && styles.mapHidden]}
-          pointerEvents={showClubMap ? 'auto' : 'none'}>
-          <ClubMapScreen onClose={() => setShowClubMap(false)} />
-        </View>
-      )}
+        {(mapPreheated || showClubMap) && (
+          <View
+            style={[styles.screenSlot, !showClubMap && styles.mapHidden]}
+            pointerEvents={showClubMap ? 'auto' : 'none'}>
+            <ClubMapScreen onClose={() => setShowClubMap(false)} />
+          </View>
+        )}
 
-      {/* Избранное — над нав-баром, открывается из Профиля (448:10703).
+        {/* Избранное — над нав-баром, открывается из Профиля (448:10703).
           Скрыто, пока открыта аффирмация: его FixedHeader (zIndex 10) иначе
           всплывает поверх пейджера. */}
-      {showFavorites && !favAffirmation && (
-        <View style={styles.screenSlot}>
-          <FavoritesScreen
-            onBack={() => {
-              setShowFavorites(false);
-              if (favoritesFromPlayerRef.current) {
+        {showFavorites && !favAffirmation && (
+          <View style={styles.screenSlot}>
+            <FavoritesScreen
+              onBack={() => {
+                setShowFavorites(false);
+                if (favoritesFromPlayerRef.current) {
+                  favoritesFromPlayerRef.current = false;
+                  reopenPlayer();
+                }
+              }}
+              onGoPractices={() => {
                 favoritesFromPlayerRef.current = false;
-                reopenPlayer();
-              }
-            }}
-            onGoPractices={() => {
-              favoritesFromPlayerRef.current = false;
-              setShowFavorites(false);
-              handleTabPress(2);
-            }}
-            onOpenAffirmation={setFavAffirmation}
-          />
-        </View>
-      )}
+                setShowFavorites(false);
+                handleTabPress(2);
+              }}
+              onOpenAffirmation={setFavAffirmation}
+            />
+          </View>
+        )}
 
-      {/* Настройки — над нав-баром, открывается из Профиля (448:10501). */}
-      {showSettings && (
-        <View style={styles.screenSlot}>
-          <SettingsScreen onBack={() => setShowSettings(false)} />
-        </View>
-      )}
+        {/* Настройки — над нав-баром, открывается из Профиля (448:10501). */}
+        {showSettings && (
+          <View style={styles.screenSlot}>
+            <SettingsScreen onBack={() => setShowSettings(false)} />
+          </View>
+        )}
 
-      {/* Мини-бар «Продолжить практику» (448:11841) — под шапкой на всех
+        {/* Мини-бар «Продолжить практику» (448:11841) — под шапкой на всех
           экранах; полноэкранные оверлеи ниже по коду перекрывают его. */}
-      <MiniPlayer />
+        <MiniPlayer />
 
-      {/* Аффирмация из «Избранного» — пейджер поверх Избранного, открытый на
+        {/* Аффирмация из «Избранного» — пейджер поверх Избранного, открытый на
           сохранённой аффирмации; «назад» возвращает в Избранное. */}
-      {favAffirmation && (
-        <View style={styles.screenSlot}>
-          <AffirmationsScreen
-            initial={{id: favAffirmation.id, text: favAffirmation.title}}
-            onBack={() => setFavAffirmation(null)}
-          />
-        </View>
-      )}
+        {favAffirmation && (
+          <View style={styles.screenSlot}>
+            <AffirmationsScreen
+              initial={{id: favAffirmation.id, text: favAffirmation.title}}
+              onBack={() => setFavAffirmation(null)}
+            />
+          </View>
+        )}
 
-      {/* Аффирмация по диплинку — пейджер поверх текущего экрана. */}
-      {linkAffirmation && (
-        <View style={styles.screenSlot}>
-          <AffirmationsScreen
-            key={linkAffirmation}
-            initial={{id: linkAffirmation}}
-            onBack={() => setLinkAffirmation(null)}
-          />
-        </View>
-      )}
+        {/* Аффирмация по диплинку — пейджер поверх текущего экрана. */}
+        {linkAffirmation && (
+          <View style={styles.screenSlot}>
+            <AffirmationsScreen
+              key={linkAffirmation}
+              initial={{id: linkAffirmation}}
+              onBack={() => setLinkAffirmation(null)}
+            />
+          </View>
+        )}
 
-      {/* Auth sheet — above the nav bar; opens from Welcome and Profile. */}
-      {showAuth && (
-        <View style={styles.screenSlot}>
-          <AuthScreen onClose={() => setShowAuth(false)} />
-        </View>
-      )}
+        {/* First-launch welcome — covers the whole app until dismissed. */}
+        {showWelcome && (
+          <View style={styles.screenSlot}>
+            <WelcomeScreen onStart={() => dismissWelcome()} />
+          </View>
+        )}
 
-      {/* First-launch welcome — covers the whole app until dismissed. */}
-      {showWelcome && (
-        <View style={styles.screenSlot}>
-          <WelcomeScreen
-            onStart={() => dismissWelcome(false)}
-            onSignIn={() => dismissWelcome(true)}
-          />
-        </View>
-      )}
+        {/* Global search — above the nav bar (design 448:11117). */}
+        {showSearch && (
+          <View style={styles.screenSlot}>
+            <SearchScreen
+              onBack={() => setShowSearch(false)}
+              onOpenCategory={id => {
+                setShowSearch(false);
+                setSelectedState(null);
+                opacities.forEach((op, i) =>
+                  op.setValue(i === 2 ? VISIBLE : HIDDEN),
+                );
+                setActiveTab(2);
+                setPracticesFormat(prev => ({id, n: (prev?.n ?? 0) + 1}));
+              }}
+            />
+          </View>
+        )}
 
-      {/* Global search — above the nav bar (design 448:11117). */}
-      {showSearch && (
-        <View style={styles.screenSlot}>
-          <SearchScreen
-            onBack={() => setShowSearch(false)}
-            onOpenCategory={id => {
-              setShowSearch(false);
-              setSelectedState(null);
-              opacities.forEach((op, i) =>
-                op.setValue(i === 2 ? VISIBLE : HIDDEN),
-              );
-              setActiveTab(2);
-              setPracticesFormat(prev => ({id, n: (prev?.n ?? 0) + 1}));
-            }}
-          />
-        </View>
-      )}
-
-      {/* Stories overlay sits above everything, including the nav bar. */}
-      {showStories && (
-        <View style={styles.screenSlot}>
-          <StoriesScreen
-            content={storyContent}
-            onClose={() => setShowStories(false)}
-            onOpenPractices={() => {
-              setShowStories(false);
-              handleTabPress(2);
-            }}
-          />
-        </View>
-      )}
-    </GradientBackground>
+        {/* Stories overlay sits above everything, including the nav bar. */}
+        {showStories && (
+          <View style={styles.screenSlot}>
+            <StoriesScreen
+              key={storiesOpenAt ?? 'default'}
+              content={storyContent}
+              openAt={storiesOpenAt ?? undefined}
+              onClose={() => {
+                setShowStories(false);
+                setStoriesOpenAt(null);
+              }}
+              onOpenPractices={() => {
+                setShowStories(false);
+                handleTabPress(2);
+              }}
+            />
+          </View>
+        )}
+      </GradientBackground>
     </SearchContext.Provider>
   );
 }

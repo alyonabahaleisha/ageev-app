@@ -13,12 +13,15 @@ export type DeepLinkType =
   | 'affirmation'
   | 'meditation'
   | 'webinar'
-  | 'breakfast';
+  | 'breakfast'
+  // Сторис дня (id — дата YYYY-MM-DD). Только из локального пуша с
+  // аффирмацией: открывает сторис на слайде «Аффирмация дня».
+  | 'story';
 
 export type DeepLink = {type: DeepLinkType; id: string};
 
 const LINK_RE =
-  /(?:^ageev:\/\/|\/l\/)(affirmation|meditation|webinar|breakfast)\/([^/?#]+)/;
+  /(?:^ageev:\/\/|\/l\/)(affirmation|meditation|webinar|breakfast|story)\/([^/?#]+)/;
 
 export function parseDeepLink(url: string): DeepLink | null {
   const m = url.match(LINK_RE);

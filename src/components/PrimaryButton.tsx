@@ -2,10 +2,10 @@ import React from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
-  Text,
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
+import {Text} from './Text';
 import {colors} from '../theme/colors';
 import {fonts} from '../theme/typography';
 

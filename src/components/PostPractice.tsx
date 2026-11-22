@@ -1,27 +1,18 @@
 import React, {useState} from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {ScrollView, StyleSheet, TouchableOpacity, View} from 'react-native';
+import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   ICON_CLOCK,
   ICON_CLOSE_PLAYER,
-  ICON_HEART_FILLED,
   ICON_PLAY_TRIANGLE,
-  ICON_STORY_HEART,
   ICON_STORY_SHARE,
 } from '../assets/icons';
+import {AnimatedHeart} from './AnimatedHeart';
 import LinearGradient from './LinearGradient';
 import {RemoteImage} from './RemoteImage';
-import {
-  ShareAffirmationItem,
-  ShareAffirmationModal,
-} from './ShareAffirmation';
+import {ShareAffirmationItem, ShareAffirmationModal} from './ShareAffirmation';
 import {PlayerTrack} from '../context/PlayerContext';
 import {dailyAffirmationIndex, useAffirmations} from '../services/affirmations';
 import {useFavorites} from '../services/favorites';
@@ -201,14 +192,8 @@ export function PostPracticeOverlay({onClose, onOpenTrack}: Props) {
                       title: affirmation.text,
                     })
                   }>
-                  <SvgXml
-                    xml={
-                      isFavorite('affirmation', affirmation.id)
-                        ? ICON_HEART_FILLED
-                        : ICON_STORY_HEART
-                    }
-                    width={24}
-                    height={24}
+                  <AnimatedHeart
+                    liked={isFavorite('affirmation', affirmation.id)}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -301,7 +286,8 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-  },  ctaBtnDisabled: {
+  },
+  ctaBtnDisabled: {
     opacity: 0.5,
   },
   skipBtn: {

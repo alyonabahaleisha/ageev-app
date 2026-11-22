@@ -25,7 +25,9 @@ export type StoryContent = {
   // Reel 2 — "Духовный завтрак" audio practice.
   breakfast: {backgroundUrl?: string; body?: string; track?: PlayerTrack};
   // Reel 3 — affirmation of the day.
-  affirmation: {backgroundUrl?: string; text?: string};
+  // id — для избранного: документ storyAffirmations или story_<дата> для
+  // текста, вписанного в день напрямую.
+  affirmation: {id?: string; backgroundUrl?: string; text?: string};
 };
 
 function todayKey(): string {
@@ -113,6 +115,7 @@ export function useDailyStory(): {content: StoryContent | null; loading: boolean
             track,
           },
           affirmation: {
+            id: day.affirmationId || `story_${dateKey}`,
             backgroundUrl: (aff?.background as string) || undefined,
             // Pool item's text, else the inline text chosen from the library.
             text: (aff?.text as string) || day.affirmationText || undefined,

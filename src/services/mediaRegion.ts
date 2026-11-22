@@ -2,6 +2,7 @@ import {AppState, NativeModules, Platform} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from 'react-native-config';
 import {track as trackEvent} from './analytics';
+import {breadcrumb} from './diagnostics';
 
 // Откуда грузить медиа — выбирается НЕ по стране, а по тому, какое зеркало
 // реально доступно с текущей сети:
@@ -174,11 +175,14 @@ async function probeOne(region: Region): Promise<ProbeResult> {
   try {
     // ?t= обходит HTTP-кэш клиента; у S3-совместимых хранилищ лишний
     // query-параметр на GET объекта игнорируется.
-    const res = await fetch(`${MIRROR_BASE[region]}${PROBE_PATH}?t=${started}`, {
-      method: 'GET',
-      headers: {'Cache-Control': 'no-cache'},
-      signal: controller.signal,
-    });
+    const res = await fetch(
+      `${MIRROR_BASE[region]}${PROBE_PATH}?t=${started}`,
+      {
+        method: 'GET',
+        headers: {'Cache-Control': 'no-cache'},
+        signal: controller.signal,
+      },
+    );
     if (!res.ok) {
       return {region, ok: false, ms: Date.now() - started};
     }
@@ -192,11 +196,16 @@ async function probeOne(region: Region): Promise<ProbeResult> {
   }
 }
 
+let lastProbe: {at: string; ruMs: number; worldMs: number} | null = null;
+/** Последний результат пробника (для отчёта диагностики). */
+export function getLastProbe() {
+  return lastProbe;
+}
+
 function applyProbe(results: ProbeResult[]): Region | null {
-  const byRegion = Object.fromEntries(results.map(r => [r.region, r])) as Record<
-    Region,
-    ProbeResult
-  >;
+  const byRegion = Object.fromEntries(
+    results.map(r => [r.region, r]),
+  ) as Record<Region, ProbeResult>;
   const before = getRegion();
   const current = preferredRegion();
   const other = otherRegion(current);
@@ -225,13 +234,21 @@ function applyProbe(results: ProbeResult[]): Region | null {
   }
 
   const after = getRegion();
-  trackEvent('media_probe', {
-    ru_ms: byRegion.ru?.ok ? byRegion.ru.ms : -1,
-    world_ms: byRegion.world?.ok ? byRegion.world.ms : -1,
-    region: after,
-  });
+  const ruMs = byRegion.ru?.ok ? byRegion.ru.ms : -1;
+  const worldMs = byRegion.world?.ok ? byRegion.world.ms : -1;
+  lastProbe = {at: new Date().toISOString(), ruMs, worldMs};
+  trackEvent('media_probe', {ru_ms: ruMs, world_ms: worldMs, region: after});
+  breadcrumb(`media probe ru=${ruMs}ms world=${worldMs}ms → ${after}`);
+  if (ruMs < 0 && worldMs < 0) {
+    // С этой сети не видно ни одного зеркала — практики играть не будут.
+    trackEvent('media_no_mirror', {region: after});
+  }
   if (after !== before) {
-    trackEvent('media_mirror_switch', {from: before, to: after, reason: 'probe'});
+    trackEvent('media_mirror_switch', {
+      from: before,
+      to: after,
+      reason: 'probe',
+    });
     notify();
   }
   return winner;
@@ -278,6 +295,7 @@ export function reportMirrorFailure(region: Region | null): Region {
   const before = getRegion();
   failedUntil[region] = Date.now() + FAILURE_PENALTY_MS;
   const after = getRegion();
+  breadcrumb(`mirror failure ${region} → ${after}`);
   if (after !== before) {
     trackEvent('media_mirror_switch', {
       from: before,

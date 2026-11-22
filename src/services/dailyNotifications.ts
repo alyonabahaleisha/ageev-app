@@ -155,7 +155,9 @@ export async function ensureDailyAffirmationNotifications(
     for (const d of dates) {
       const key = dateKey(d);
       let body = storyTexts[key];
-      let linkId: string | undefined;
+      // Сторисная аффирмация живёт вне библиотеки — пуш ведёт на сторис дня
+      // (слайд «Аффирмация дня», там же сердечко). Библиотечная — в пейджер.
+      let url: string | undefined = body ? `ageev://story/${key}` : undefined;
       if (!body && library.length) {
         // Тот же ротатор, что dailyAffirmationIndex на главной: номер дня
         // (UTC) по модулю размера библиотеки.
@@ -164,7 +166,7 @@ export async function ensureDailyAffirmationNotifications(
             Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000,
           ) % library.length;
         body = library[idx].text;
-        linkId = library[idx].id;
+        url = `ageev://affirmation/${library[idx].id}`;
       }
       if (!body) continue;
 
@@ -173,7 +175,7 @@ export async function ensureDailyAffirmationNotifications(
           id: ID_PREFIX + key,
           title,
           body,
-          data: linkId ? {url: `ageev://affirmation/${linkId}`} : {},
+          data: url ? {url} : {},
           ios: {sound: 'default'},
           android: channelId
             ? {channelId, pressAction: {id: 'default'}}

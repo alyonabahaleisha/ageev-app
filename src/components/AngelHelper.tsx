@@ -5,10 +5,10 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from './Text';
 import {RemoteImage} from './RemoteImage';
 import {
   hasStateContent,

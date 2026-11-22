@@ -1,19 +1,25 @@
-import React, {useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {
+  ActivityIndicator,
   Image,
   Keyboard,
   Linking,
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from '../components/Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ICON_BACK, ICON_SEARCH, ICON_EXPAND} from '../assets/icons';
+import {
+  ICON_BACK,
+  ICON_SEARCH,
+  ICON_EXPAND,
+  ICON_LOCATION,
+} from '../assets/icons';
 import {
   FixedHeader,
   headerScrollPadding,
@@ -21,7 +27,16 @@ import {
 } from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
 import LinearGradient from '../components/LinearGradient';
-import {useClubs} from '../services/clubs';
+import {Club, useClubs} from '../services/clubs';
+import {
+  LocationError,
+  LocationErrorKind,
+  NearbyClub,
+  formatDistanceKm,
+  getCurrentLocation,
+  nearestClubs,
+} from '../services/nearbyClubs';
+import {track} from '../services/analytics';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -57,6 +72,42 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
   // появляются две крупные кнопки; с одной ссылкой — открывается сразу.
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // «Клубы рядом со мной»: тот же оверлей, что и поиск, но список — ближайшие
+  // клубы по геопозиции телефона с расстоянием. Решает случай, когда в городе
+  // пользователя клуба нет и поиск по названию даёт «Ничего не найдено».
+  type Nearby =
+    | {status: 'idle'}
+    | {status: 'loading'}
+    | {status: 'ready'; items: NearbyClub[]}
+    | {status: 'error'; kind: LocationErrorKind};
+  const [nearbyActive, setNearbyActive] = useState(false);
+  const [nearby, setNearby] = useState<Nearby>({status: 'idle'});
+
+  const loadNearby = useCallback(async () => {
+    setNearby({status: 'loading'});
+    try {
+      const origin = await getCurrentLocation();
+      const items = nearestClubs(clubs, origin, 5);
+      setNearby({status: 'ready', items});
+      track('clubs_nearby', {
+        result: 'ok',
+        nearest_km: items[0] ? Math.round(items[0].distanceKm) : -1,
+      });
+    } catch (e) {
+      const kind = e instanceof LocationError ? e.kind : 'unavailable';
+      setNearby({status: 'error', kind});
+      track('clubs_nearby', {result: kind});
+    }
+  }, [clubs]);
+
+  const openNearby = useCallback(() => {
+    setSearchActive(false);
+    setQuery('');
+    Keyboard.dismiss();
+    setNearbyActive(true);
+    loadNearby();
+  }, [loadNearby]);
+
   function handleClubPress(club: {
     id: string;
     telegramUrl?: string;
@@ -81,10 +132,11 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
 
   const closeSearch = () => {
     setSearchActive(false);
+    setNearbyActive(false);
     setQuery('');
     Keyboard.dismiss();
   };
-  useBackHandler(closeSearch, searchActive);
+  useBackHandler(closeSearch, searchActive || nearbyActive);
 
   const count = clubs.length;
   const cityForms: [string, string, string] = [
@@ -102,6 +154,75 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
           'clubs_card_subtitle_empty',
           'Найдите ближайшее пространство практики и поддержки.',
         );
+
+  // Строка клуба (общая для поиска и «рядом со мной»); info — подпись под
+  // городом: страна · лидер, для ближайших — расстояние · страна.
+  const renderRow = (club: Club, i: number, info?: string) => (
+    <React.Fragment key={club.id}>
+      {i > 0 && <View style={styles.resultDivider} />}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={styles.resultRow}
+        onPress={() => handleClubPress(club)}>
+        <View style={styles.resultText}>
+          <Text style={styles.resultCity}>{club.city}</Text>
+          <Text style={styles.resultInfo} numberOfLines={1}>
+            {info ?? [club.country, club.leader].filter(Boolean).join(' · ')}
+          </Text>
+        </View>
+        <View style={styles.resultBtn}>
+          <View style={styles.resultArrow}>
+            <SvgXml xml={ICON_BACK} width={20} height={20} />
+          </View>
+        </View>
+      </TouchableOpacity>
+      {expandedId === club.id && !!club.telegramUrl && !!club.vkUrl && (
+        <View style={styles.linkButtons}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.linkBtn}
+            onPress={() => Linking.openURL(club.telegramUrl).catch(() => {})}>
+            <Text style={styles.linkBtnText}>
+              {t('clubs_link_telegram', 'Telegram')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={styles.linkBtn}
+            onPress={() => Linking.openURL(club.vkUrl!).catch(() => {})}>
+            <Text style={styles.linkBtnText}>
+              {t('clubs_link_vk', 'ВКонтакте')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </React.Fragment>
+  );
+
+  const nearbyButton = (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={openNearby}
+      style={styles.searchField}>
+      <SvgXml xml={ICON_LOCATION} width={16} height={16} />
+      <Text style={styles.searchPlaceholder}>
+        {t('clubs_nearby_button', 'Клубы рядом со мной')}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const nearbyErrorText = (kind: LocationErrorKind) =>
+    kind === 'denied'
+      ? t(
+          'clubs_nearby_denied',
+          'Нет доступа к геопозиции. Разрешите её в настройках телефона.',
+        )
+      : kind === 'timeout'
+        ? t('clubs_nearby_timeout', 'Не удалось определить местоположение.')
+        : t(
+            'clubs_nearby_unavailable',
+            'Геопозиция недоступна. Проверьте, что она включена.',
+          );
 
   return (
     <>
@@ -169,6 +290,7 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
               {t('clubs_search_placeholder', 'Найти город')}
             </Text>
           </TouchableOpacity>
+          {nearbyButton}
         </View>
       </ScrollView>
 
@@ -205,54 +327,85 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
             keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}>
             <View style={styles.results}>
-              {results.map((club, i) => (
-                <React.Fragment key={club.id}>
-                  {i > 0 && <View style={styles.resultDivider} />}
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.resultRow}
-                    onPress={() => handleClubPress(club)}>
-                    <View style={styles.resultText}>
-                      <Text style={styles.resultCity}>{club.city}</Text>
-                      <Text style={styles.resultInfo} numberOfLines={1}>
-                        {[club.country, club.leader].filter(Boolean).join(' · ')}
-                      </Text>
-                    </View>
-                    <View style={styles.resultBtn}>
-                      <View style={styles.resultArrow}>
-                        <SvgXml xml={ICON_BACK} width={20} height={20} />
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                  {expandedId === club.id &&
-                    !!club.telegramUrl &&
-                    !!club.vkUrl && (
-                      <View style={styles.linkButtons}>
-                        <TouchableOpacity
-                          activeOpacity={0.85}
-                          style={styles.linkBtn}
-                          onPress={() =>
-                            Linking.openURL(club.telegramUrl).catch(() => {})
-                          }>
-                          <Text style={styles.linkBtnText}>
-                            {t('clubs_link_telegram', 'Telegram')}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          activeOpacity={0.85}
-                          style={styles.linkBtn}
-                          onPress={() =>
-                            Linking.openURL(club.vkUrl!).catch(() => {})
-                          }>
-                          <Text style={styles.linkBtnText}>
-                            {t('clubs_link_vk', 'ВКонтакте')}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                </React.Fragment>
-              ))}
+              {results.map((club, i) => renderRow(club, i))}
               {results.length === 0 && (
+                <>
+                  <Text style={styles.resultEmpty}>
+                    {t('clubs_search_empty', 'Ничего не найдено')}
+                  </Text>
+                  {nearbyButton}
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </GradientBackground>
+      )}
+
+      {/* «Рядом со мной» — ближайшие клубы по геопозиции с расстоянием. */}
+      {nearbyActive && (
+        <GradientBackground style={styles.searchOverlay}>
+          <View style={[styles.searchTopRow, {paddingTop: headerScrollPadding(top)}]}>
+            <View style={[styles.searchField, styles.searchFieldActive]}>
+              <SvgXml xml={ICON_LOCATION} width={16} height={16} />
+              <Text style={styles.searchInput} numberOfLines={1}>
+                {t('clubs_nearby_title', 'Клубы рядом с вами')}
+              </Text>
+            </View>
+            <TouchableOpacity activeOpacity={0.8} onPress={closeSearch}>
+              <Text style={styles.searchCancel}>
+                {t('clubs_search_cancel', 'Отмена')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.resultsContent}
+            showsVerticalScrollIndicator={false}>
+            <View style={styles.results}>
+              {nearby.status === 'loading' && (
+                <View style={styles.nearbyState}>
+                  <ActivityIndicator color={colors.white} />
+                  <Text style={styles.resultEmpty}>
+                    {t('clubs_nearby_loading', 'Определяем ваше местоположение…')}
+                  </Text>
+                </View>
+              )}
+              {nearby.status === 'error' && (
+                <View style={styles.nearbyState}>
+                  <Text style={styles.resultEmpty}>
+                    {nearbyErrorText(nearby.kind)}
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={styles.linkBtn}
+                    onPress={() =>
+                      nearby.kind === 'denied'
+                        ? Linking.openSettings().catch(() => {})
+                        : loadNearby()
+                    }>
+                    <Text style={styles.linkBtnText}>
+                      {nearby.kind === 'denied'
+                        ? t('clubs_nearby_open_settings', 'Открыть настройки')
+                        : t('clubs_nearby_retry', 'Повторить')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {nearby.status === 'ready' &&
+                nearby.items.map((club, i) =>
+                  renderRow(
+                    club,
+                    i,
+                    [
+                      formatDistanceKm(club.distanceKm, t('clubs_km', 'км')),
+                      club.country,
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
+                  ),
+                )}
+              {nearby.status === 'ready' && nearby.items.length === 0 && (
                 <Text style={styles.resultEmpty}>
                   {t('clubs_search_empty', 'Ничего не найдено')}
                 </Text>
@@ -263,7 +416,7 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
       )}
 
       {/* Fixed header — search button only, per design (411:7349) */}
-      {!searchActive && (
+      {!searchActive && !nearbyActive && (
         <FixedHeader>
           <View style={styles.header}>
             <View />
@@ -500,5 +653,10 @@ const styles = StyleSheet.create({
     opacity: 0.65,
     textAlign: 'center',
     paddingVertical: 8,
+  },
+  nearbyState: {
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 24,
   },
 });

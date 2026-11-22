@@ -1,12 +1,6 @@
 import React from 'react';
-import {
-  Dimensions,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {Dimensions, Image, StyleSheet, View} from 'react-native';
+import {Text} from '../components/Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_PLAY_POLYGON} from '../assets/icons';
@@ -23,17 +17,20 @@ const COVER_SIZE = SCREEN_W - SECTION_MARGIN * 2; // 342 на макете 390
 
 type Props = {
   onStart: () => void;
-  onSignIn: () => void;
 };
 
 /** Welcome (Figma 411:6531) — первый запуск: обложка, приветствие, Начать. */
-export function WelcomeScreen({onStart, onSignIn}: Props) {
+export function WelcomeScreen({onStart}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const t = useUIStrings();
 
   return (
     <GradientBackground>
-      <View style={[styles.content, {paddingTop: top + 25, paddingBottom: bottom + 34}]}>
+      <View
+        style={[
+          styles.content,
+          {paddingTop: top + 25, paddingBottom: bottom + 34},
+        ]}>
         {/* Видео-обложка с кнопкой play */}
         <View style={styles.coverGlow}>
           <View style={styles.coverCard}>
@@ -81,17 +78,6 @@ export function WelcomeScreen({onStart, onSignIn}: Props) {
             onPress={onStart}
             style={styles.startButton}
           />
-          <View style={styles.signInRow}>
-            <Text style={styles.signInText}>
-              {t('welcome_registered', 'Уже зарегистрированы? ')}
-            </Text>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={onSignIn}
-              style={styles.linkHit}>
-              <Text style={styles.link}>{t('welcome_signin', 'Войти')}</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     </GradientBackground>
@@ -160,21 +146,5 @@ const styles = StyleSheet.create({
   },
   startButton: {
     alignSelf: 'stretch',
-  },
-  signInRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  signInText: {
-    ...typography.body,
-    color: colors.white,
-  },
-  linkHit: {
-    paddingVertical: 4,
-  },
-  link: {
-    ...typography.body,
-    color: colors.brand.pale,
   },
 });

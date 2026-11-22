@@ -36,10 +36,39 @@ function emitClubs() {
   storeListeners.forEach(l => l());
 }
 
+/** Ссылка клуба из CMS в пригодном для Linking виде или undefined.
+ *  В данных встречаются пробел вместо пустого поля, пробелы по краям и
+ *  опечатки в схеме («htthttps://») — такие значения раньше рисовали кнопку
+ *  Telegram/ВК, которая ничего не открывала. */
+export function normalizeClubLink(raw?: string | null): string | undefined {
+  let url = (raw || '').trim();
+  if (!url) return undefined;
+  // «htthttps://…» → «https://…»: мусорные буквы перед настоящей схемой.
+  url = url.replace(/^[ht]+(https?:\/\/)/i, '$1');
+  if (!/^https?:\/\//i.test(url)) {
+    if (/^(www\.)?(t\.me|telegram\.me|vk\.com|vk\.ru)\//i.test(url)) {
+      url = 'https://' + url;
+    } else if (/^@[\w\d_]+$/.test(url)) {
+      url = 'https://t.me/' + url.slice(1);
+    } else {
+      return undefined;
+    }
+  }
+  return /\s/.test(url) ? undefined : url;
+}
+
+function normalizeClub(c: Club): Club {
+  return {
+    ...c,
+    telegramUrl: normalizeClubLink(c.telegramUrl) ?? '',
+    vkUrl: normalizeClubLink(c.vkUrl),
+  };
+}
+
 AsyncStorage.getItem(CACHE_KEY)
   .then(raw => {
     if (!raw || store.length > 0) return;
-    const cached = JSON.parse(raw) as Club[];
+    const cached = (JSON.parse(raw) as Club[]).map(normalizeClub);
     if (Array.isArray(cached) && cached.length > 0 && store.length === 0) {
       store = cached;
       storeLoaded = true;
@@ -55,7 +84,9 @@ export function startClubsSync(): void {
   onSnapshot(
     collection(db, 'clubs'),
     snapshot => {
-      store = snapshot.docs.map(d => ({id: d.id, ...d.data()} as Club));
+      store = snapshot.docs.map(d =>
+        normalizeClub({id: d.id, ...d.data()} as Club),
+      );
       storeLoaded = true;
       emitClubs();
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify(store)).catch(() => {});

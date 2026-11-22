@@ -1,9 +1,12 @@
 import React from 'react';
-import {Platform, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Platform, StyleSheet, TouchableOpacity, View} from 'react-native';
+import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import TrackPlayer, {usePlaybackState, State} from 'react-native-track-player';
-import {ICON_CLOSE, ICON_PAUSE, ICON_PLAY_TRIANGLE} from '../assets/icons';
+import {ICON_CLOSE} from '../assets/icons';
+import {LoadingSpinner} from './LoadingSpinner';
+import {PlayPauseIcon} from './PlayPauseIcon';
 import {usePlayer} from '../context/PlayerContext';
 import {formatDuration} from '../services/meditations';
 import {useUIStrings} from '../services/uiStrings';
@@ -35,6 +38,8 @@ export function MiniPlayer() {
   }
 
   const isPlaying = playback.state === State.Playing;
+  const isLoading =
+    playback.state === State.Loading || playback.state === State.Buffering;
 
   return (
     // Правки (Figma 489:11217): бар 40px, отступ от шапки 10px — плеер
@@ -46,12 +51,11 @@ export function MiniPlayer() {
         onPress={() => {
           togglePlay().catch(() => {});
         }}>
-        <SvgXml
-          xml={isPlaying ? ICON_PAUSE : ICON_PLAY_TRIANGLE}
-          width={isPlaying ? 16 : 14}
-          height={isPlaying ? 16 : 13}
-          opacity={0.88}
-        />
+        {isLoading ? (
+          <LoadingSpinner size={16} stroke={1.5} />
+        ) : (
+          <PlayPauseIcon playing={isPlaying} size={16} opacity={0.88} />
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity

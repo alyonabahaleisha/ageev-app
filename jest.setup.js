@@ -50,6 +50,25 @@ jest.mock('@react-native-firebase/app', () => ({
   getApps: () => [],
 }));
 
+jest.mock('react-native-device-info', () => ({
+  __esModule: true,
+  default: {
+    getSystemVersion: () => '18.0',
+    getModel: () => 'iPhone',
+    getBrand: () => 'Apple',
+    getVersion: () => '1.0.0',
+    getBuildNumber: () => '0',
+    getFreeDiskStorage: () => Promise.resolve(0),
+    getCarrier: () => Promise.resolve(''),
+  },
+}));
+jest.mock('@react-native-firebase/crashlytics', () => ({
+  getCrashlytics: () => ({}),
+  log: jest.fn(),
+  recordError: jest.fn(),
+  setAttributes: () => Promise.resolve(null),
+  setUserId: () => Promise.resolve(null),
+}));
 jest.mock('@react-native-firebase/analytics', () => ({
   __esModule: true,
   getAnalytics: jest.fn(),
@@ -97,18 +116,13 @@ jest.mock('react-native-webview', () => {
   };
 });
 
-jest.mock('@react-native-google-signin/google-signin', () => ({
-  __esModule: true,
-  GoogleSignin: {configure: jest.fn(), hasPlayServices: jest.fn(), signIn: jest.fn()},
-  statusCodes: {},
-}));
 
-jest.mock('@invertase/react-native-apple-authentication', () => ({
+
+jest.mock('@react-native-community/geolocation', () => ({
   __esModule: true,
-  appleAuth: {
-    performRequest: jest.fn(),
-    Operation: {LOGIN: 1},
-    Scope: {EMAIL: 0, FULL_NAME: 1},
-    isSupported: false,
+  default: {
+    setRNConfiguration: jest.fn(),
+    requestAuthorization: jest.fn(),
+    getCurrentPosition: jest.fn(),
   },
 }));

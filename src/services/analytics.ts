@@ -3,7 +3,6 @@ import {
   getAnalytics,
   logEvent,
   logScreenView,
-  setUserId,
 } from '@react-native-firebase/analytics';
 
 // Firebase Analytics (GA4). Все вызовы fire-and-forget и безопасны без
@@ -41,11 +40,4 @@ export function trackScreen(screenName: string): void {
     screen_name: screenName,
     screen_class: screenName,
   }).catch(() => {});
-}
-
-/** Привязка событий к uid Firebase Auth (null при выходе). */
-export function trackUser(uid: string | null): void {
-  const a = analyticsOrNull();
-  if (!a) return;
-  setUserId(a, uid).catch(() => {});
 }

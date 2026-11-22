@@ -1,12 +1,12 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Platform, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Platform, StyleSheet, TouchableOpacity, View} from 'react-native';
+import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {ICON_CLOSE} from '../assets/icons';
 import {requestOpenFavorites} from '../services/appNavigation';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {fonts, typography} from '../theme/typography';
-import {useAuth} from '../context/AuthContext';
 
 // «Сохранено» banner (design 448:13206) — появляется после добавления в
 // избранное; тап открывает Избранное, крестик закрывает. Общий для плеера
@@ -50,9 +50,6 @@ type Props = {
 
 export function SavedToast({top, onClose, onOpenFavorites}: Props) {
   const t = useUIStrings();
-  // У гостя раздел «Избранное» закрыт замком — предлагаем войти, а не
-  // «смотреть в разделе».
-  const {user} = useAuth();
   return (
     <View style={[styles.toast, {top}]}>
       <TouchableOpacity
@@ -66,9 +63,7 @@ export function SavedToast({top, onClose, onOpenFavorites}: Props) {
         <Text style={styles.title}>{t('player_saved_title', 'Сохранено')}</Text>
         <View style={styles.row}>
           <Text style={styles.sub}>
-            {user
-              ? t('player_saved_sub', 'Смотреть в разделе')
-              : t('player_saved_sub_guest', 'Войдите, чтобы открыть')}
+            {t('player_saved_sub', 'Смотреть в разделе')}
           </Text>
           <Text style={styles.link}>
             {t('player_saved_favorites', 'Избранное')}

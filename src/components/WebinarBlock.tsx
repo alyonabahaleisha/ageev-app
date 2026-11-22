@@ -4,10 +4,10 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {ICON_CLOCK, ICON_PLAY_TRIANGLE} from '../assets/icons';
 import {formatDuration} from '../services/meditations';

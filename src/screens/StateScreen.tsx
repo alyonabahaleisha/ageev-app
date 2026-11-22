@@ -6,22 +6,21 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   ViewStyle,
 } from 'react-native';
+import {Text} from '../components/Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   ICON_BACK,
   ICON_CLOCK,
   ICON_CLOSE,
-  ICON_HEART,
-  ICON_HEART_FILLED,
   ICON_PLAY_TRIANGLE,
   ICON_SHARE,
 } from '../assets/icons';
+import {AnimatedHeart} from '../components/AnimatedHeart';
 import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {GradientBackground} from '../components/GradientBackground';
 import LinearGradient from '../components/LinearGradient';
@@ -97,7 +96,10 @@ function MediaCard({
           <View style={styles.mediaContent}>
             <View style={styles.mediaTextCol}>
               <View style={styles.mediaTextTop}>
-                <Text style={styles.mediaTitle} numberOfLines={2} android_hyphenationFrequency="full">
+                <Text
+                  style={styles.mediaTitle}
+                  numberOfLines={2}
+                  android_hyphenationFrequency="full">
                   {title}
                 </Text>
                 {!!description && (
@@ -141,7 +143,10 @@ function RowCard({
       activeOpacity={0.85}
       style={styles.rowCard}
       onPress={onPress}>
-      <Text style={styles.rowTitle} numberOfLines={2} android_hyphenationFrequency="full">
+      <Text
+        style={styles.rowTitle}
+        numberOfLines={2}
+        android_hyphenationFrequency="full">
         {title}
       </Text>
       <View style={styles.playBtn}>
@@ -180,9 +185,7 @@ export function StateScreen({state, onBack}: Props) {
   const [exerciseOpen, setExerciseOpen] = useState(false);
   const {isFavorite, toggleFavorite} = useFavorites();
   const toast = useSavedToast();
-  const [shareItem, setShareItem] = useState<ShareAffirmationItem | null>(
-    null,
-  );
+  const [shareItem, setShareItem] = useState<ShareAffirmationItem | null>(null);
 
   const stateMeditations = useMemo(
     () =>
@@ -202,8 +205,7 @@ export function StateScreen({state, onBack}: Props) {
   const ex = state.exercise;
   const exerciseImage = ex.image || state.coverImage;
   const affBg = state.affirmationsBackground || state.coverImage;
-  const canStartExercise =
-    ex.steps.length > 0 || ex.recommendations.length > 0;
+  const canStartExercise = ex.steps.length > 0 || ex.recommendations.length > 0;
   const hasExercise = !!(ex.title || ex.description || canStartExercise);
 
   // Header progress: the state's activities are worked through in order
@@ -316,85 +318,94 @@ export function StateScreen({state, onBack}: Props) {
               {state.affirmations.map((a, i) => {
                 const cardBg = a.background || affBg;
                 return (
-                <View key={i} style={styles.affGlow}>
-                 <View style={styles.affShadow}>
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    style={styles.affCard}
-                    onPress={() => {
-                      markStep('affirmations');
-                      setFlowOpen(true);
-                    }}>
-                    {!!cardBg && (
-                      <RemoteImage
-                        source={{uri: cardBg}}
-                        style={styles.affBg}
-                        resizeMode="cover"
-                      />
-                    )}
-                    <LinearGradient
-                      colors={['rgba(0,0,0,0.25)', 'rgba(102,102,102,0.25)']}
-                      start={{x: 0, y: 0}}
-                      end={{x: 1, y: 1}}
-                      style={styles.affBg}
-                    />
-                    <View style={styles.affCardInner}>
-                      <View style={styles.affTextBlock}>
-                        <Text style={styles.affText} numberOfLines={2}>
-                          {a.text}
-                        </Text>
-                        <View style={styles.affMoreWrap}>
-                          <Text style={styles.affMore}>
-                            {t('state_affirmation_more', 'Читать полностью')}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={styles.affIcons}>
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-                          onPress={() => {
-                            const added = !isFavorite(
-                              'affirmation',
-                              `${state.id}_aff_${i}`,
-                            );
-                            toggleFavorite({
-                              kind: 'affirmation',
-                              id: `${state.id}_aff_${i}`,
-                              title: a.text,
-                              coverUrl: cardBg,
-                            });
-                            toast.onToggled(added);
-                          }}
-                          style={
-                            isFavorite('affirmation', `${state.id}_aff_${i}`)
-                              ? undefined
-                              : styles.iconDim
-                          }>
-                          <SvgXml
-                            xml={
-                              isFavorite('affirmation', `${state.id}_aff_${i}`)
-                                ? ICON_HEART_FILLED
-                                : ICON_HEART
-                            }
-                            width={24}
-                            height={24}
+                  <View key={i} style={styles.affGlow}>
+                    <View style={styles.affShadow}>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        style={styles.affCard}
+                        onPress={() => {
+                          markStep('affirmations');
+                          setFlowOpen(true);
+                        }}>
+                        {!!cardBg && (
+                          <RemoteImage
+                            source={{uri: cardBg}}
+                            style={styles.affBg}
+                            resizeMode="cover"
                           />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-                          onPress={() =>
-                            setShareItem({text: a.text, backgroundUrl: cardBg})
-                          }
-                          style={styles.iconDim}>
-                          <SvgXml xml={ICON_SHARE} width={24} height={24} />
-                        </TouchableOpacity>
-                      </View>
+                        )}
+                        <LinearGradient
+                          colors={[
+                            'rgba(0,0,0,0.25)',
+                            'rgba(102,102,102,0.25)',
+                          ]}
+                          start={{x: 0, y: 0}}
+                          end={{x: 1, y: 1}}
+                          style={styles.affBg}
+                        />
+                        <View style={styles.affCardInner}>
+                          <View style={styles.affTextBlock}>
+                            <Text style={styles.affText} numberOfLines={2}>
+                              {a.text}
+                            </Text>
+                            <View style={styles.affMoreWrap}>
+                              <Text style={styles.affMore}>
+                                {t(
+                                  'state_affirmation_more',
+                                  'Читать полностью',
+                                )}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.affIcons}>
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                              onPress={() => {
+                                const added = !isFavorite(
+                                  'affirmation',
+                                  `${state.id}_aff_${i}`,
+                                );
+                                toggleFavorite({
+                                  kind: 'affirmation',
+                                  id: `${state.id}_aff_${i}`,
+                                  title: a.text,
+                                  coverUrl: cardBg,
+                                });
+                                toast.onToggled(added);
+                              }}
+                              style={
+                                isFavorite(
+                                  'affirmation',
+                                  `${state.id}_aff_${i}`,
+                                )
+                                  ? undefined
+                                  : styles.iconDim
+                              }>
+                              <AnimatedHeart
+                                liked={isFavorite(
+                                  'affirmation',
+                                  `${state.id}_aff_${i}`,
+                                )}
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              activeOpacity={0.7}
+                              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                              onPress={() =>
+                                setShareItem({
+                                  text: a.text,
+                                  backgroundUrl: cardBg,
+                                })
+                              }
+                              style={styles.iconDim}>
+                              <SvgXml xml={ICON_SHARE} width={24} height={24} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
                     </View>
-                  </TouchableOpacity>
-                 </View>
-                </View>
+                  </View>
                 );
               })}
             </ScrollView>
@@ -407,7 +418,10 @@ export function StateScreen({state, onBack}: Props) {
                   setFlowOpen(true);
                 }}>
                 <Text style={styles.primaryBtnText}>
-                  {t('state_affirmations_flow_btn', 'Погрузиться в поток аффирмаций')}
+                  {t(
+                    'state_affirmations_flow_btn',
+                    'Погрузиться в поток аффирмаций',
+                  )}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -667,10 +681,7 @@ function splitPoints(body?: string): string[] {
 }
 
 // ── Guided exercise flow (intro → steps → recommendations) ───────────────────
-type FlowPage =
-  | {kind: 'intro'}
-  | {kind: 'step'; idx: number}
-  | {kind: 'recs'};
+type FlowPage = {kind: 'intro'} | {kind: 'step'; idx: number} | {kind: 'recs'};
 
 function ExerciseFlow({
   exercise,
@@ -736,7 +747,10 @@ function ExerciseFlow({
         // Intro screen — title, text, button, then a contained image.
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.exIntroScroll, {paddingBottom: bottom + 24}]}
+          contentContainerStyle={[
+            styles.exIntroScroll,
+            {paddingBottom: bottom + 24},
+          ]}
           showsVerticalScrollIndicator={false}>
           {!!title && <Text style={styles.exTitle}>{title}</Text>}
           {!!intro && <Text style={styles.exIntroBody}>{intro}</Text>}

@@ -2,7 +2,6 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
-import GoogleSignIn
 import FirebaseCore
 
 @main
@@ -11,6 +10,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
+  // Окно и запуск RN — в SceneDelegate (UIScene обязателен с SDK iOS 27);
+  // здесь только фабрика. launchOptions сохраняем для сцены.
+  var launchOptions: [UIApplication.LaunchOptionsKey: Any]?
 
   func application(
     _ application: UIApplication,
@@ -27,28 +29,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
-
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "AgeevApp",
-      in: window,
-      launchOptions: launchOptions
-    )
+    self.launchOptions = launchOptions
 
     return true
   }
 
-  // Возврат из окна выбора Google-аккаунта (Google Sign-In) и диплинки
-  // ageev:// — последние уходят в JS через RCTLinkingManager.
+  // Со сценами URL/universal links приходят в SceneDelegate; эти методы
+  // оставлены на случай запуска без сцены (старые iOS без манифеста).
   func application(
     _ app: UIApplication,
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    if GIDSignIn.sharedInstance.handle(url) {
-      return true
-    }
     return RCTLinkingManager.application(app, open: url, options: options)
   }
 

@@ -5,10 +5,10 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from '../components/Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_SEARCH} from '../assets/icons';

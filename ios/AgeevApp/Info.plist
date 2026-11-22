@@ -27,12 +27,6 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.188401884866-jj14sur0ob037i8bpkp8cf2e1okqo17t</string>
-			</array>
-		</dict>
-		<dict>
 			<key>CFBundleURLName</key>
 			<string>com.mikhail.manifestation.deeplink</string>
 			<key>CFBundleURLSchemes</key>
@@ -52,6 +46,7 @@
 		<string>whatsapp</string>
 		<string>tg</string>
 		<string>vk</string>
+		<string>googlegmail</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
@@ -63,7 +58,7 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Чтобы показать клубы рядом с вами</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Сохранение изображения аффирмации в вашу галерею</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -81,6 +76,23 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

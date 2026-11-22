@@ -1,16 +1,9 @@
 import React from 'react';
-import {
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {Platform, StyleSheet, TouchableOpacity, View} from 'react-native';
+import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {ICON_USER, ICON_SEARCH} from '../assets/icons';
-import {RemoteImage} from './RemoteImage';
 import {useSearch} from '../context/SearchContext';
-import {useAuth, userDisplayName} from '../context/AuthContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -28,10 +21,9 @@ type Props = {
 export function HomeHeader({name, onPressProfile}: Props) {
   const t = useUIStrings();
   const {openSearch} = useSearch();
-  const {user} = useAuth();
-  // Вошедший пользователь видит своё имя; у гостя строки с именем нет —
-  // тогда и запятая в приветствии лишняя.
-  const displayName = name || (user ? userDisplayName(user) : '');
+  // Аккаунтов нет: имя — только если передано явно; без имени и запятая в
+  // приветствии лишняя.
+  const displayName = name || '';
   const welcome = t('home_header_welcome', 'Добро пожаловать,');
   return (
     <View style={styles.container}>
@@ -41,29 +33,28 @@ export function HomeHeader({name, onPressProfile}: Props) {
         style={styles.greeting}
         onPress={onPressProfile}
         disabled={!onPressProfile}>
-        {/* White glow layer → dark shadow layer → solid avatar.
-            Фото приходит из Google/Apple-аккаунта (photoURL). */}
+        {/* White glow layer → dark shadow layer → solid avatar. */}
         <View style={styles.cardGlow}>
           <View style={styles.cardShadow}>
             <View style={styles.avatar}>
-              {user?.photoURL ? (
-                <RemoteImage
-                  source={{uri: user.photoURL}}
-                  style={styles.avatarPhoto}
-                  resizeMode="cover"
-                />
-              ) : (
-                <SvgXml xml={ICON_USER} width={ICON_SIZE} height={ICON_SIZE} />
-              )}
+              <SvgXml xml={ICON_USER} width={ICON_SIZE} height={ICON_SIZE} />
             </View>
           </View>
         </View>
         <View style={styles.textBlock}>
-          <Text style={styles.welcomeText} numberOfLines={1}>
+          <Text
+            style={styles.welcomeText}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}>
             {displayName ? welcome : welcome.replace(/,\s*$/, '')}
           </Text>
           {!!displayName && (
-            <Text style={styles.nameText} numberOfLines={1}>
+            <Text
+              style={styles.nameText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}>
               {displayName}
             </Text>
           )}
@@ -72,7 +63,10 @@ export function HomeHeader({name, onPressProfile}: Props) {
 
       {/* Right: frosted circle — white glow wrapper keeps radius small so shape stays circular */}
       <View style={styles.searchGlow}>
-        <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn} onPress={openSearch}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.searchBtn}
+          onPress={openSearch}>
           <SvgXml xml={ICON_SEARCH} width={ICON_SIZE} height={ICON_SIZE} />
         </TouchableOpacity>
       </View>
@@ -128,14 +122,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarPhoto: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_RADIUS,
   },
   textBlock: {
     width: 148,

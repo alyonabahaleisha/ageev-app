@@ -4,14 +4,20 @@ import {
   Image,
   ImageSourcePropType,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from '../Text';
 import Svg, {Defs, RadialGradient, Rect, Stop, SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ICON_QUOTE, ICON_STORY_HEART, ICON_STORY_SHARE} from '../../assets/icons';
+import {
+  ICON_QUOTE,
+  ICON_STORY_SHARE,
+} from '../../assets/icons';
+import {AnimatedHeart} from '../AnimatedHeart';
 import {RemoteImage} from '../RemoteImage';
+import {SavedToast, useSavedToast} from '../SavedToast';
+import {useFavorites} from '../../services/favorites';
 import {StoryContent} from '../../services/stories';
 import {useUIStrings} from '../../services/uiStrings';
 import {colors} from '../../theme/colors';
@@ -163,6 +169,17 @@ function AffirmationSlide({onReady, content}: SlideProps) {
   const {top} = useSafeAreaInsets();
   const affirmation = content?.affirmation;
   const t = useUIStrings();
+  // Сердечко: сторисная аффирмация уходит в «Избранное» как обычная
+  // (kind 'affirmation', title = текст) — оттуда открывается в пейджере.
+  const {isFavorite, toggleFavorite} = useFavorites();
+  const toast = useSavedToast();
+  const favId = affirmation?.text ? affirmation.id : undefined;
+  const saved = !!favId && isFavorite('affirmation', favId);
+  const onHeart = () => {
+    if (!favId || !affirmation?.text) return;
+    toggleFavorite({kind: 'affirmation', id: favId, title: affirmation.text});
+    toast.onToggled(!saved);
+  };
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <SlideBackground
@@ -183,10 +200,17 @@ function AffirmationSlide({onReady, content}: SlideProps) {
             )}
         </Text>
         <View style={styles.iconRow}>
-          <SvgXml xml={ICON_STORY_HEART} width={24} height={24} />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            disabled={!favId}
+            hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}
+            onPress={onHeart}>
+            <AnimatedHeart liked={saved} />
+          </TouchableOpacity>
           <SvgXml xml={ICON_STORY_SHARE} width={24} height={24} />
         </View>
       </View>
+      {toast.visible && <SavedToast top={top + 64} onClose={toast.hide} />}
     </View>
   );
 }

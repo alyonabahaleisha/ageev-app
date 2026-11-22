@@ -1,29 +1,27 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {
+  Alert,
   Linking,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from '../components/Text';
 import {SvgXml} from 'react-native-svg';
+import Clipboard from '@react-native-clipboard/clipboard';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   ICON_CHEVRON_RIGHT,
-  ICON_EDIT,
   ICON_INSTAGRAM,
-  ICON_LOCK,
   ICON_SEARCH,
   ICON_TELEGRAM,
   ICON_USER_30,
   ICON_YOUTUBE,
 } from '../assets/icons';
-import {RemoteImage} from '../components/RemoteImage';
-import {EditProfileScreen} from './EditProfileScreen';
 import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {PrimaryButton} from '../components/PrimaryButton';
-import {useAuth, userDisplayName} from '../context/AuthContext';
+import {useSearch} from '../context/SearchContext';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -32,38 +30,48 @@ const SECTION_MARGIN = 24;
 const BTN_SIZE = 47;
 
 type Props = {
-  onOpenAuth: () => void;
   onOpenFavorites: () => void;
   onOpenSettings: () => void;
 };
 
-/** Профиль (Figma 411:7252) и гостевой режим (411:7181). */
-export function ProfileScreen({
-  onOpenAuth,
-  onOpenFavorites,
-  onOpenSettings,
-}: Props) {
+/** Профиль (Figma 411:7252). Аккаунтов нет: избранное и настройки живут на
+ *  устройстве, поэтому разделы открыты всем. */
+export function ProfileScreen({onOpenFavorites, onOpenSettings}: Props) {
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
-  const {user} = useAuth();
   const t = useUIStrings();
-  // «Изменить профиль» (Figma 507:10649): открывается по карандашу в шапке.
-  const [showEdit, setShowEdit] = useState(false);
-
-  const loggedIn = !!user;
-
+  const {openSearch} = useSearch();
   function openUrl(url: string) {
     if (url) Linking.openURL(url).catch(() => {});
   }
 
-  // Строки списка. Разделы без своих экранов пока никуда не ведут; в гостевом
-  // режиме «закрытые» разделы открывают авторизацию.
-  const rows: {key: string; label: string; locked?: boolean; onPress?: () => void}[] = [
+  // «Связаться с поддержкой»: письмо на адрес школы. Если почтового клиента
+  // нет (mailto отклонён системой), пробуем приложение Gmail, иначе копируем
+  // адрес в буфер и показываем его.
+  const SUPPORT_EMAIL = 'ageev.school.app@gmail.com';
+  function openSupportEmail(url: string) {
+    const address = url.match(/^mailto:([^?]+)/)?.[1] || SUPPORT_EMAIL;
+    const subject = url.match(/[?&]subject=([^&]*)/)?.[1] || '';
+    const gmail = `googlegmail://co?to=${address}&subject=${subject}`;
+    const showAddress = () => {
+      Clipboard.setString(address);
+      Alert.alert(
+        t('profile_support_button', 'Связаться с поддержкой'),
+        t(
+          'profile_support_copied',
+          `Напишите нам на ${address} — адрес скопирован.`,
+        ),
+      );
+    };
+    Linking.openURL(url).catch(() => Linking.openURL(gmail).catch(showAddress));
+  }
+
+  // Строки списка.
+  const rows: {key: string; label: string; onPress?: () => void}[] = [
     {
       key: 'favorites',
       label: t('profile_tab_favorites', 'Избранное'),
-      locked: !loggedIn,
-      onPress: loggedIn ? onOpenFavorites : onOpenAuth,
+      onPress: onOpenFavorites,
     },
     // «Курсы и события» и «Донейшн» — страницы сайта; открываются в системном
     // браузере, а не во встроенном WebView (решение по продукту, 2026-10-04).
@@ -95,48 +103,24 @@ export function ProfileScreen({
           {paddingTop: scrollPad, paddingBottom: bottom + 110},
         ]}
         showsVerticalScrollIndicator={false}>
-        {/* Аватар + приветствие; фото приходит от Google/Apple (photoURL) */}
+        {/* Аватар + приветствие. Аккаунтов нет — поясняем, что избранное
+            хранится на устройстве. */}
         <View style={styles.profileRow}>
           <View style={styles.avatar}>
-            {user?.photoURL ? (
-              <RemoteImage
-                source={{uri: user.photoURL}}
-                style={styles.avatarPhoto}
-                resizeMode="cover"
-              />
-            ) : (
-              <SvgXml xml={ICON_USER_30} width={30} height={30} />
-            )}
+            <SvgXml xml={ICON_USER_30} width={30} height={30} />
           </View>
           <View style={styles.profileText}>
-            {loggedIn ? (
-              <>
-                <Text style={styles.welcomeLine}>
-                  {t('profile_welcome', 'Добро пожаловать,')}
-                </Text>
-                <Text style={styles.nameLine}>{userDisplayName(user)}</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.nameLine}>
-                  {t('profile_guest_title', 'Вы не вошли в аккаунт')}
-                </Text>
-                <Text style={styles.guestSubtitle}>
-                  {t('profile_guest_subtitle', 'Сохраните практики и прогресс')}
-                </Text>
-              </>
-            )}
+            <Text style={styles.nameLine}>
+              {t('profile_welcome_local', 'Добро пожаловать')}
+            </Text>
+            <Text style={styles.guestSubtitle}>
+              {t(
+                'profile_local_subtitle',
+                'Избранное хранится на этом устройстве',
+              )}
+            </Text>
           </View>
         </View>
-
-        {/* Гость: кнопка входа */}
-        {!loggedIn && (
-          <PrimaryButton
-            title={t('profile_signin_button', 'Войти / создать аккаунт')}
-            onPress={onOpenAuth}
-            style={styles.signInButton}
-          />
-        )}
 
         {/* Разделы */}
         <View style={styles.tabs}>
@@ -147,9 +131,6 @@ export function ProfileScreen({
               onPress={row.onPress}
               style={styles.tabRow}>
               <View style={styles.tabLeft}>
-                {row.locked && (
-                  <SvgXml xml={ICON_LOCK} width={20} height={20} />
-                )}
                 <Text style={styles.tabLabel}>{row.label}</Text>
               </View>
               <SvgXml xml={ICON_CHEVRON_RIGHT} width={24} height={24} />
@@ -198,38 +179,37 @@ export function ProfileScreen({
               </TouchableOpacity>
             </View>
           </View>
-          {loggedIn && (
-            <PrimaryButton
-              title={t('profile_support_button', 'Связаться с поддержкой')}
-              onPress={() => openUrl(t('profile_support_url', ''))}
-            />
-          )}
+          <PrimaryButton
+            title={t('profile_support_button', 'Связаться с поддержкой')}
+            onPress={() =>
+              openSupportEmail(
+                t(
+                  'profile_support_url',
+                  'mailto:ageev.school.app@gmail.com?subject=%D0%92%D0%BE%D0%BF%D1%80%D0%BE%D1%81%20%D0%BF%D0%BE%20%D0%BF%D1%80%D0%B8%D0%BB%D0%BE%D0%B6%D0%B5%D0%BD%D0%B8%D1%8E',
+                ),
+              )
+            }
+          />
         </View>
       </ScrollView>
 
-      {/* Шапка: Профиль + поиск/редактирование */}
+      {/* Шапка: Профиль + поиск */}
       <FixedHeader>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('profile_title', 'Профиль')}</Text>
+          <Text style={styles.headerTitle}>
+            {t('profile_title', 'Профиль')}
+          </Text>
           <View style={styles.headerButtons}>
-            <View style={styles.headerBtn}>
-              <SvgXml xml={ICON_SEARCH} width={24} height={24} />
-            </View>
-            {/* Правки (Figma 507:10675): карандаш открывает «Изменить
-                профиль», а не вход/удаление; гостю — авторизацию. */}
+            {/* Глобальный поиск — как на остальных экранах (useSearch). */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={loggedIn ? () => setShowEdit(true) : onOpenAuth}
+              onPress={openSearch}
               style={styles.headerBtn}>
-              <SvgXml xml={ICON_EDIT} width={24} height={24} />
+              <SvgXml xml={ICON_SEARCH} width={24} height={24} />
             </TouchableOpacity>
           </View>
         </View>
       </FixedHeader>
-
-      {showEdit && user && (
-        <EditProfileScreen onClose={() => setShowEdit(false)} />
-      )}
     </>
   );
 }
@@ -291,21 +271,9 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   // Фото скругляем само (overflow:hidden на контейнере срезал бы тень)
-  avatarPhoto: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-  },
   profileText: {
     flex: 1,
     gap: 5,
-  },
-  welcomeLine: {
-    ...typography.body,
-    color: colors.white,
   },
   nameLine: {
     ...typography.bodyLarge,
@@ -315,10 +283,6 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.white,
     opacity: 0.65,
-  },
-
-  signInButton: {
-    marginTop: 18,
   },
 
   // ── Разделы ────────────────────────────────────────────────────────────────

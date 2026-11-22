@@ -3,10 +3,10 @@ import {
   Image,
   Modal,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';

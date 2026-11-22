@@ -9,6 +9,7 @@ import {
 } from '@dr.pogodin/react-native-fs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {track as trackEvent} from './analytics';
+import {breadcrumb} from './diagnostics';
 
 // Audio files are downloaded once into the OS cache directory and played from
 // disk afterwards. iOS may purge Caches under disk pressure — that's fine, the
@@ -34,7 +35,10 @@ const inFlight = new Set<string>();
 // сохранённый как .mp3, не декодируется при повторном воспроизведении (медитации
 // и вебинары молчат, а завтраки-mp3 играют).
 function extFromUrl(url: string): string {
-  const m = url.split('?')[0].toLowerCase().match(/\.(m4a|mp3|aac|wav)$/);
+  const m = url
+    .split('?')[0]
+    .toLowerCase()
+    .match(/\.(m4a|mp3|aac|wav)$/);
   return m ? `.${m[1]}` : '.mp3';
 }
 
@@ -55,7 +59,10 @@ export async function ensureAudioCacheVersion(): Promise<void> {
     }
     if (await exists(AUDIO_DIR)) {
       await unlink(AUDIO_DIR);
-      trackEvent('audio_cache_purged', {from: v ?? 'none', to: CACHE_VERSION});
+      trackEvent('audio_cache_purged', {
+        from: v ?? 'none',
+        to: CACHE_VERSION,
+      });
     }
     await AsyncStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION);
   } catch (e) {
@@ -78,14 +85,20 @@ export async function getCachedAudioUrl(
 }
 
 /** Удалить трек из кэша (плеер не смог воспроизвести локальный файл). */
-export async function removeCachedAudio(id: string, url: string): Promise<void> {
+export async function removeCachedAudio(
+  id: string,
+  url: string,
+): Promise<void> {
   const path = localPath(id, url);
   await unlink(path).catch(() => {});
   await unlink(`${path}.part`).catch(() => {});
   trackEvent('audio_cache_evicted', {track_id: id});
 }
 
-function headerValue(headers: Record<string, string> | undefined, name: string) {
+function headerValue(
+  headers: Record<string, string> | undefined,
+  name: string,
+) {
   if (!headers) {
     return '';
   }
@@ -153,13 +166,17 @@ export async function downloadAudio(
     const size = (await stat(tmp).catch(() => null))?.size ?? bytesWritten ?? 0;
     const type = contentType.toLowerCase();
     const typeOk =
-      !type || type.startsWith('audio/') || type.startsWith('application/octet-stream');
+      !type ||
+      type.startsWith('audio/') ||
+      type.startsWith('application/octet-stream');
     const sizeOk =
       size >= MIN_AUDIO_BYTES && (contentLength <= 0 || size === contentLength);
     if (!typeOk || !sizeOk) {
       outcome = 'invalid_content';
       throw new Error(
-        `invalid content: type=${type || '?'} size=${size} expected=${contentLength}`,
+        `invalid content: type=${
+          type || '?'
+        } size=${size} expected=${contentLength}`,
       );
     }
 
@@ -168,6 +185,11 @@ export async function downloadAudio(
   } catch (e) {
     await unlink(tmp).catch(() => {});
     console.warn('[AudioCache] download failed:', e);
+    breadcrumb(
+      `audio cache ${id}: ${outcome} type=${contentType || 'none'} ${String(
+        e,
+      )}`,
+    );
     trackEvent('audio_cache_download_failed', {
       track_id: id,
       outcome,

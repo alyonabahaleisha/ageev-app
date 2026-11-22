@@ -3,9 +3,9 @@ import {
   Image,
   Platform,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import {Text} from './Text';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';

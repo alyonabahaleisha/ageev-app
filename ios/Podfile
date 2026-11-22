@@ -21,10 +21,9 @@ end
 target 'AgeevApp' do
   config = use_native_modules!
 
-  # GoogleSignIn (Swift-поды AppCheckCore и т.п.) требует module maps у своих
-  # Objective-C зависимостей при статической линковке.
+  # Swift-подам Firebase нужны module maps их Objective-C зависимостей при
+  # статической линковке.
   pod 'GoogleUtilities', :modular_headers => true
-  pod 'RecaptchaInterop', :modular_headers => true
 
   # Firebase Analytics (@react-native-firebase) при статической линковке:
   # Swift-подам Firebase нужны module maps их Objective-C зависимостей.
@@ -34,6 +33,11 @@ target 'AgeevApp' do
   pod 'FirebaseInstallations', :modular_headers => true
   pod 'GoogleDataTransport', :modular_headers => true
   pod 'nanopb', :modular_headers => true
+  # Crashlytics тянет Swift-под FirebaseSessions — ему тоже нужны module maps.
+  pod 'PromisesObjC', :modular_headers => true
+  pod 'FirebaseRemoteConfigInterop', :modular_headers => true
+  pod 'FirebaseSessions', :modular_headers => true
+  pod 'FirebaseCrashlytics', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -48,5 +52,13 @@ target 'AgeevApp' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    # Xcode 27 считает ошибкой IPHONEOS_DEPLOYMENT_TARGET < 15.0 у старых подов
+    # (nanopb, GoogleDataTransport, SDWebImage, ...) — поднимаем до 15.1.
+    installer.pods_project.targets.each do |t|
+      t.build_configurations.each do |c|
+        v = c.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1' if v && v.to_f < 15.1
+      end
+    end
   end
 end

@@ -4,10 +4,10 @@ import {
   Easing,
   Image,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from './Text';
 import Svg, {Circle} from 'react-native-svg';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';

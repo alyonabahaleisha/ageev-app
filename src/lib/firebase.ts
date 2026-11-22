@@ -1,14 +1,9 @@
 import {initializeApp, getApps} from 'firebase/app';
 import {Firestore, getFirestore, initializeFirestore} from 'firebase/firestore';
-import {Auth, getAuth, initializeAuth} from 'firebase/auth';
-// @ts-ignore — getReactNativePersistence живёт в RN-сборке @firebase/auth,
-// которую Metro подхватывает по exports-условию "react-native", но публичные
-// типы firebase/auth её не объявляют.
-import {getReactNativePersistence} from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {firebaseConfig} from '../config/env';
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app =
+  getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 // React Native's network stack doesn't reliably support Firestore's default
 // WebChannel streaming transport (reads silently hang, especially on iOS), so
@@ -23,15 +18,6 @@ try {
 
 export const db = firestore;
 
-// Auth with AsyncStorage persistence so the session survives app restarts.
-// Same hot-reload guard as Firestore above.
-let authInstance: Auth;
-try {
-  authInstance = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} catch {
-  authInstance = getAuth(app);
-}
-
-export const auth = authInstance;
+// Аутентификации в приложении нет (решение 2026-11: не храним данные
+// пользователей). Firestore — только публичное чтение контента и анонимные
+// отчёты диагностики; избранное живёт локально (services/favorites.ts).

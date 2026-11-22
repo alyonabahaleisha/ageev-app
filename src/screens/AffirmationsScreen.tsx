@@ -8,19 +8,18 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {Text} from '../components/Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   ICON_ARROW_UP,
   ICON_BACK,
-  ICON_HEART_FILLED,
-  ICON_STORY_HEART,
   ICON_STORY_SHARE,
 } from '../assets/icons';
+import {AnimatedHeart} from '../components/AnimatedHeart';
 import {
   Affirmation,
   dailyAffirmationIndex,
@@ -33,7 +32,6 @@ import {
   ShareAffirmationModal,
 } from '../components/ShareAffirmation';
 import {useFavorites} from '../services/favorites';
-import {TEXT_SCALES, useAppSettings} from '../services/settings';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
@@ -50,16 +48,10 @@ const HINT_BOTTOM_RATIO = (844 - 714) / 844; // 130/844
 const ALL_FILTER = 'Все';
 
 // Правки (Figma 489:11217): размер текста в карточках единый — 22px, без
-// подстройки под длину. `scale` — пользовательский «Размер текста» из
-// настроек.
-function fontForText(
-  _text: string,
-  scale: number,
-): {fontSize: number; lineHeight: number} {
-  return {
-    fontSize: Math.round(22 * scale),
-    lineHeight: Math.round(30 * scale),
-  };
+// подстройки под длину. Пользовательский «Размер текста» применяет общий
+// компонент Text.
+function fontForText(_text: string): {fontSize: number; lineHeight: number} {
+  return {fontSize: 22, lineHeight: 30};
 }
 
 type Props = {
@@ -74,15 +66,32 @@ export function AffirmationsScreen({onBack, initial}: Props) {
   useHideMiniPlayer();
   const {top, bottom} = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState(0);
-  const [shareItem, setShareItem] = useState<ShareAffirmationItem | null>(
-    null,
-  );
+  const [shareItem, setShareItem] = useState<ShareAffirmationItem | null>(null);
   const listRef = useRef<FlatList<Affirmation>>(null);
-  const {affirmations, loading} = useAffirmations();
+  const {affirmations: library, loading} = useAffirmations();
+  // Из «Избранного» может прийти аффирмация вне библиотеки (сохранённая со
+  // слайда сторис): добавляем её первой карточкой, иначе пейджер молча
+  // открылся бы на другой.
+  const initialId = initial?.id;
+  const initialText = initial?.text;
+  const affirmations = useMemo<Affirmation[]>(() => {
+    if (!initialText) return library;
+    const known = library.some(
+      a => a.id === initialId || a.text === initialText,
+    );
+    if (known) return library;
+    return [
+      {
+        id: initialId ?? 'saved',
+        text: initialText,
+        category: 'saved',
+        categoryLabel: '',
+      },
+      ...library,
+    ];
+  }, [library, initialId, initialText]);
   const {isFavorite, toggleFavorite} = useFavorites();
   const toast = useSavedToast();
-  const {settings} = useAppSettings();
-  const textScale = TEXT_SCALES[settings.textSize];
   const t = useUIStrings();
   const allLabel = t('affirmations_filter_all', ALL_FILTER);
 
@@ -217,7 +226,10 @@ export function AffirmationsScreen({onBack, initial}: Props) {
         ListEmptyComponent={
           <View style={[styles.page, {height: pageH}]}>
             <View
-              style={[styles.textBox, {top: textBoxTop, bottom: textBoxBottom}]}>
+              style={[
+                styles.textBox,
+                {top: textBoxTop, bottom: textBoxBottom},
+              ]}>
               {loading ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
@@ -232,9 +244,11 @@ export function AffirmationsScreen({onBack, initial}: Props) {
           <View style={[styles.page, {height: pageH}]}>
             {/* Affirmation text + icons — vertically centered, length-scaled */}
             <View
-              style={[styles.textBox, {top: textBoxTop, bottom: textBoxBottom}]}>
-              <Text
-                style={[styles.affirmationText, fontForText(item.text, textScale)]}>
+              style={[
+                styles.textBox,
+                {top: textBoxTop, bottom: textBoxBottom},
+              ]}>
+              <Text style={[styles.affirmationText, fontForText(item.text)]}>
                 {item.text}
               </Text>
               <View style={styles.actionsRow}>
@@ -250,15 +264,7 @@ export function AffirmationsScreen({onBack, initial}: Props) {
                     });
                     toast.onToggled(added);
                   }}>
-                  <SvgXml
-                    xml={
-                      isFavorite('affirmation', item.id)
-                        ? ICON_HEART_FILLED
-                        : ICON_STORY_HEART
-                    }
-                    width={24}
-                    height={24}
-                  />
+                  <AnimatedHeart liked={isFavorite('affirmation', item.id)} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   activeOpacity={0.7}

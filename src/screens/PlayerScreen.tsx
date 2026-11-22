@@ -6,14 +6,16 @@ import {
   Modal,
   PanResponder,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import {Text} from '../components/Text';
 import LinearGradient from '../components/LinearGradient';
-import Svg, {Circle, SvgXml} from 'react-native-svg';
+import Svg, {Path, SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {track as trackEvent} from '../services/analytics';
 import TrackPlayer, {
@@ -26,13 +28,12 @@ import {
   ICON_CLOSE,
   ICON_CLOSE_PLAYER,
   ICON_FORWARD10,
-  ICON_HEART,
-  ICON_HEART_FILLED,
-  ICON_PAUSE,
-  ICON_PLAY_TRIANGLE,
   ICON_REPLAY10,
   ICON_SHARE,
 } from '../assets/icons';
+import {HeartButton} from '../components/AnimatedHeart';
+import {LoadingSpinner} from '../components/LoadingSpinner';
+import {PlayPauseIcon} from '../components/PlayPauseIcon';
 import {PostPracticeOverlay} from '../components/PostPractice';
 import {RemoteImage} from '../components/RemoteImage';
 import {ShareTrackModal} from '../components/ShareAffirmation';
@@ -42,11 +43,15 @@ import {useBreakfasts} from '../services/breakfasts';
 import {itemAreas} from '../services/contentFilters';
 import {useFavorites} from '../services/favorites';
 import {formatDuration, useMeditations} from '../services/meditations';
-import {TEXT_SCALES, useAppSettings} from '../services/settings';
 import {useWebinars} from '../services/webinars';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
 import {fonts, typography} from '../theme/typography';
+
+// Системный «Размер текста» (Dynamic Type) на этом экране ограничен: при
+// максимальных accessibility-размерах один заголовок занимал пол-экрана и
+// кнопки уезжали под шторку описания.
+const MAX_FONT_SCALE = 1.3;
 
 function formatTime(seconds: number): string {
   const s = Math.floor(seconds);
@@ -176,8 +181,12 @@ function ProgressBar() {
         </View>
       </View>
       <View style={pb.timeRow}>
-        <Text style={pb.timeText}>{formatTime(shownPosition)}</Text>
-        <Text style={pb.timeText}>{formatTime(duration)}</Text>
+        <Text style={pb.timeText} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          {formatTime(shownPosition)}
+        </Text>
+        <Text style={pb.timeText} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          {formatTime(duration)}
+        </Text>
       </View>
     </View>
   );
@@ -242,148 +251,270 @@ const pb = StyleSheet.create({
   },
 });
 
-// Buffering indicator: the same travelling-light ring the home portrait uses
-// (soft glow + bright core arc), circling the play button until audio starts.
-// The arc is drawn once and the container is ROTATED with a native-driver
-// transform, so the spin stays 60fps even while the JS thread is busy
-// downloading audio (animating strokeDashoffset ran on JS and stuttered).
+// Кнопки плеера. Все анимации — трансформации/прозрачность на нативном
+// драйвере (кроме морфа иконки): остаются 60 fps, пока JS качает аудио.
 const PLAY_BTN_SIZE = 78;
-const RING_R = 35;
-const RING_C = 2 * Math.PI * RING_R;
-const RING_GLINT = RING_C * 0.28;
-const RING_SHOW_DELAY_MS = 200; // don't flash on sub-200ms buffer blips
-const RING_FADE_MS = 220;
+const LOADING_SHOW_DELAY_MS = 200; // не мигать на коротких подбуферизациях
+const LOADING_FADE_MS = 220;
 
-function BufferingRing({fade}: {fade: Animated.Value}) {
-  const spin = useRef(new Animated.Value(0)).current;
+// Пути из SVG-иконок: стрелка (наконечник + дуга) и цифры «10» отдельно,
+// чтобы крутить только стрелку, а цифры оставались ровными.
+function svgPaths(xml: string): string[] {
+  return Array.from(xml.matchAll(/<path d="([^"]+)"/g), m => m[1]);
+}
+const [REPLAY_HEAD, REPLAY_ARC, DIGITS_10] = svgPaths(ICON_REPLAY10);
+const [FORWARD_HEAD, FORWARD_ARC] = svgPaths(ICON_FORWARD10);
 
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1,
-        duration: 1100,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [spin]);
+// Перемотка ±10 с: стрелка «дёргается» в сторону перемотки и пружиной
+// возвращается, цифры коротко подпрыгивают, сама кнопка утапливается.
+function SkipButton({direction}: {direction: -1 | 1}) {
+  const press = useRef(new Animated.Value(1)).current;
+  const nudge = useRef(new Animated.Value(0)).current;
+  const digits = useRef(new Animated.Value(1)).current;
+  const head = direction < 0 ? REPLAY_HEAD : FORWARD_HEAD;
+  const arc = direction < 0 ? REPLAY_ARC : FORWARD_ARC;
 
-  const rotate = spin.interpolate({
+  const onPress = () => {
+    TrackPlayer.seekBy(10 * direction).catch(() => {});
+    nudge.setValue(0);
+    digits.setValue(1);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(nudge, {
+          toValue: 1,
+          duration: 120,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(nudge, {
+          toValue: 0,
+          tension: 120,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.timing(digits, {
+          toValue: 1.18,
+          duration: 110,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.spring(digits, {
+          toValue: 1,
+          tension: 160,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  };
+  const rotate = nudge.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+    outputRange: ['0deg', `${40 * direction}deg`],
   });
-  const c = PLAY_BTN_SIZE / 2;
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[StyleSheet.absoluteFill, {opacity: fade, transform: [{rotate}]}]}>
-      <Svg width={PLAY_BTN_SIZE} height={PLAY_BTN_SIZE}>
-        <Circle
-          cx={c}
-          cy={c}
-          r={RING_R}
-          stroke="rgba(255,255,255,0.22)"
-          strokeWidth={4}
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={[RING_GLINT, RING_C]}
-        />
-        <Circle
-          cx={c}
-          cy={c}
-          r={RING_R}
-          stroke="rgba(255,255,255,0.7)"
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={[RING_GLINT, RING_C]}
-        />
-      </Svg>
-    </Animated.View>
+    <Pressable
+      onPressIn={() =>
+        Animated.spring(press, {
+          toValue: 0.86,
+          speed: 40,
+          bounciness: 0,
+          useNativeDriver: true,
+        }).start()
+      }
+      onPressOut={() =>
+        Animated.spring(press, {
+          toValue: 1,
+          speed: 30,
+          bounciness: 10,
+          useNativeDriver: true,
+        }).start()
+      }
+      onPress={onPress}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={
+        direction < 0 ? 'Назад 10 секунд' : 'Вперёд 10 секунд'
+      }>
+      <Animated.View style={[ctrl.skipBtn, {transform: [{scale: press}]}]}>
+        <Animated.View style={[ctrl.skipLayer, {transform: [{rotate}]}]}>
+          <Svg width={35} height={35} viewBox="0 0 35 35">
+            <Path d={head} {...ctrlStroke} />
+            <Path d={arc} {...ctrlStroke} />
+          </Svg>
+        </Animated.View>
+        <Animated.View style={[ctrl.skipLayer, {transform: [{scale: digits}]}]}>
+          <Svg width={35} height={35} viewBox="0 0 35 35">
+            <Path d={DIGITS_10} fill="#FFFFFF" />
+          </Svg>
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
   );
 }
+const ctrlStroke = {
+  stroke: '#FFFFFF',
+  strokeWidth: 2,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  fill: 'none',
+};
 
 function Controls() {
   const {togglePlay} = usePlayer();
   const state = usePlaybackState();
   const isPlaying = state.state === State.Playing;
-  // Audio is being fetched/buffered (slow networks make this noticeable) —
-  // the travelling-light ring makes the wait visible.
+  // Аудио качается/буферизуется — иконка уступает место спиннеру.
   const isLoading =
     state.state === State.Loading || state.state === State.Buffering;
 
-  // Ring fades in after a short delay (skips fast-network blips) and fades
-  // out when playback starts; the icon dims on the same curve.
-  const fade = useRef(new Animated.Value(0)).current;
-  const [ringMounted, setRingMounted] = useState(false);
+  // 0 — иконка, 1 — спиннер. Появляется с задержкой (быстрые сети не
+  // мигают), уходит сразу, как пошёл звук. Иконка и спиннер меняются
+  // перекрёстно: одна тает и сжимается, другой проявляется и растёт.
+  const loading = useRef(new Animated.Value(0)).current;
+  const [spinnerMounted, setSpinnerMounted] = useState(false);
   useEffect(() => {
     if (isLoading) {
       const timer = setTimeout(() => {
-        setRingMounted(true);
-        Animated.timing(fade, {
+        setSpinnerMounted(true);
+        Animated.timing(loading, {
           toValue: 1,
-          duration: RING_FADE_MS,
-          easing: Easing.out(Easing.ease),
+          duration: LOADING_FADE_MS,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }).start();
-      }, RING_SHOW_DELAY_MS);
+      }, LOADING_SHOW_DELAY_MS);
       return () => clearTimeout(timer);
     }
-    Animated.timing(fade, {
+    Animated.timing(loading, {
       toValue: 0,
-      duration: RING_FADE_MS,
-      easing: Easing.in(Easing.ease),
+      duration: LOADING_FADE_MS,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(({finished}) => {
-      if (finished) {
-        setRingMounted(false);
-      }
+      if (finished) setSpinnerMounted(false);
     });
     return undefined;
-  }, [isLoading, fade]);
-
-  const iconOpacity = fade.interpolate({
+  }, [isLoading, loading]);
+  const iconOpacity = loading.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 0.35],
+    outputRange: [1, 0],
   });
+  const iconScale = loading.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.6],
+  });
+  const spinnerScale = loading.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.6, 1],
+  });
+
+  // Тактильность: нажатие утапливает кнопку (пружина), смена play/pause
+  // даёт короткий «пульс» и расходящееся кольцо-отклик; пока играет —
+  // стекло кнопки чуть светлее.
+  const press = useRef(new Animated.Value(1)).current;
+  const pop = useRef(new Animated.Value(1)).current;
+  const halo = useRef(new Animated.Value(0)).current;
+  const lit = useRef(new Animated.Value(isPlaying ? 1 : 0)).current;
+  const pressTo = (v: number) =>
+    Animated.spring(press, {
+      toValue: v,
+      speed: 40,
+      bounciness: v < 1 ? 0 : 8,
+      useNativeDriver: true,
+    }).start();
+  const mounted = useRef(false);
+  useEffect(() => {
+    Animated.timing(lit, {
+      toValue: isPlaying ? 1 : 0,
+      duration: 350,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    pop.setValue(1);
+    Animated.sequence([
+      Animated.timing(pop, {
+        toValue: 1.07,
+        duration: 110,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.spring(pop, {
+        toValue: 1,
+        speed: 30,
+        bounciness: 10,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [isPlaying, pop, lit]);
+  const onPress = () => {
+    halo.setValue(0);
+    Animated.timing(halo, {
+      toValue: 1,
+      duration: 520,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+    togglePlay().catch(() => {});
+  };
+  const haloScale = halo.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.5],
+  });
+  const haloOpacity = halo.interpolate({
+    inputRange: [0, 0.15, 1],
+    outputRange: [0, 0.55, 0],
+  });
+  const scale = Animated.multiply(press, pop);
 
   return (
     <View style={ctrl.row}>
-      {/* Replay 10 */}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => TrackPlayer.seekBy(-10).catch(() => {})}
-        style={ctrl.skipBtn}>
-        <SvgXml xml={ICON_REPLAY10} width={35} height={35} />
-      </TouchableOpacity>
+      <SkipButton direction={-1} />
 
-      {/* Play / Pause / Buffering */}
-      <TouchableOpacity
-        activeOpacity={0.8}
-        style={ctrl.playBtn}
-        onPress={() => {
-          togglePlay().catch(() => {});
-        }}>
-        <Animated.View style={{opacity: iconOpacity}}>
-          <SvgXml
-            xml={isPlaying ? ICON_PAUSE : ICON_PLAY_TRIANGLE}
-            width={isPlaying ? 30 : 24}
-            height={isPlaying ? 30 : 24}
+      {/* Play / Pause / Loading */}
+      <Pressable
+        onPressIn={() => pressTo(0.9)}
+        onPressOut={() => pressTo(1)}
+        onPress={onPress}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={isPlaying ? 'Пауза' : 'Играть'}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            ctrl.halo,
+            {opacity: haloOpacity, transform: [{scale: haloScale}]},
+          ]}
+        />
+        <Animated.View style={[ctrl.playBtn, {transform: [{scale}]}]}>
+          <Animated.View
+            pointerEvents="none"
+            style={[ctrl.playLit, {opacity: lit}]}
           />
+          <Animated.View
+            style={{opacity: iconOpacity, transform: [{scale: iconScale}]}}>
+            <PlayPauseIcon playing={isPlaying} size={30} />
+          </Animated.View>
+          {spinnerMounted && (
+            <LoadingSpinner
+              size={30}
+              stroke={2}
+              style={[
+                ctrl.spinner,
+                {opacity: loading, transform: [{scale: spinnerScale}]},
+              ]}
+            />
+          )}
         </Animated.View>
-        {ringMounted && <BufferingRing fade={fade} />}
-      </TouchableOpacity>
+      </Pressable>
 
-      {/* Forward 10 */}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => TrackPlayer.seekBy(10).catch(() => {})}
-        style={ctrl.skipBtn}>
-        <SvgXml xml={ICON_FORWARD10} width={35} height={35} />
-      </TouchableOpacity>
+      <SkipButton direction={1} />
     </View>
   );
 }
@@ -400,10 +531,36 @@ const ctrl = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  skipLayer: {
+    position: 'absolute',
+    width: 35,
+    height: 35,
+  },
+  halo: {
+    position: 'absolute',
+    width: PLAY_BTN_SIZE,
+    height: PLAY_BTN_SIZE,
+    borderRadius: PLAY_BTN_SIZE / 2,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.7)',
+  },
+  playLit: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: PLAY_BTN_SIZE / 2,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  spinner: {
+    position: 'absolute',
+  },
   playBtn: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
+    width: PLAY_BTN_SIZE,
+    height: PLAY_BTN_SIZE,
+    borderRadius: PLAY_BTN_SIZE / 2,
+    overflow: 'visible',
     backgroundColor: 'rgba(255,255,255,0.14)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
@@ -425,7 +582,12 @@ const ctrl = StyleSheet.create({
 
 const SHEET_BODY_H = Math.min(340, Dimensions.get('window').height * 0.42);
 const DEFAULT_HEADER_H = 82; // visible height of the collapsed sheet header
-
+// Обложка 280×280 (Figma 448:13148) помещается только на высоких экранах с
+// обычным размером шрифта. На iPhone 16 с увеличенным текстом (и на любом
+// экране ниже ~850 pt) кнопки управления уезжали под шторку описания —
+// поэтому обложка занимает оставшееся место и ужимается до COVER_MIN.
+const COVER_MAX = 280;
+const COVER_MIN = 140;
 
 // translateY snap points: 0 = fully expanded, SHEET_BODY_H = collapsed (the
 // body is pushed off the bottom of the screen, leaving only the drag header).
@@ -456,8 +618,7 @@ function SimilarList({track, bottom}: {track: PlayerTrack; bottom: number}) {
   let similar = currentAreas.length
     ? all.filter(
         i =>
-          i.id !== track.id &&
-          itemAreas(i).some(a => currentAreas.includes(a)),
+          i.id !== track.id && itemAreas(i).some(a => currentAreas.includes(a)),
       )
     : [];
   if (similar.length === 0 && track.kind) {
@@ -468,7 +629,10 @@ function SimilarList({track, bottom}: {track: PlayerTrack; bottom: number}) {
     return (
       <View style={styles.placeholder}>
         <Text style={styles.placeholderText}>
-          {t('player_similar_placeholder', 'Скоро здесь появятся похожие практики.')}
+          {t(
+            'player_similar_placeholder',
+            'Скоро здесь появятся похожие практики.',
+          )}
         </Text>
       </View>
     );
@@ -477,7 +641,10 @@ function SimilarList({track, bottom}: {track: PlayerTrack; bottom: number}) {
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.sheetScroll, {paddingBottom: bottom + 24}]}>
+      contentContainerStyle={[
+        styles.sheetScroll,
+        {paddingBottom: bottom + 24},
+      ]}>
       {similar.map((item, i) => (
         <React.Fragment key={`${item.kind}_${item.id}`}>
           {i > 0 && <View style={styles.similarDivider} />}
@@ -520,14 +687,14 @@ function SimilarList({track, bottom}: {track: PlayerTrack; bottom: number}) {
 function DetailsSheet({
   description,
   track,
+  onHeaderHeight,
 }: {
   description: string;
   track: PlayerTrack;
+  onHeaderHeight: (h: number) => void;
 }) {
   const {bottom} = useSafeAreaInsets();
   const t = useUIStrings();
-  const {settings} = useAppSettings();
-  const textScale = TEXT_SCALES[settings.textSize];
   const tabs = [
     t('player_tab_description', 'Описание'),
     t('player_tab_similar', 'Похожие практики'),
@@ -603,7 +770,9 @@ function DetailsSheet({
 
   return (
     <Animated.View style={[styles.sheet, {transform: [{translateY}]}]}>
-      <View {...pan.panHandlers}>
+      <View
+        {...pan.panHandlers}
+        onLayout={e => onHeaderHeight(e.nativeEvent.layout.height)}>
         <View style={styles.grabber}>
           <View style={styles.sheetHandle} />
         </View>
@@ -618,7 +787,8 @@ function DetailsSheet({
                 style={[
                   styles.tabText,
                   i !== activeTab && styles.tabTextInactive,
-                ]}>
+                ]}
+                maxFontSizeMultiplier={MAX_FONT_SCALE}>
                 {label}
               </Text>
             </TouchableOpacity>
@@ -630,13 +800,16 @@ function DetailsSheet({
         {activeTab === 0 ? (
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={[styles.sheetScroll, {paddingBottom: bottom + 24}]}>
+            contentContainerStyle={[
+              styles.sheetScroll,
+              {paddingBottom: bottom + 24},
+            ]}>
             <Text
               style={[
                 styles.description,
                 {
-                  fontSize: Math.round(16 * textScale),
-                  lineHeight: Math.round(22 * textScale),
+                  fontSize: 16,
+                  lineHeight: 22,
                 },
               ]}>
               {description?.trim() ||
@@ -652,11 +825,43 @@ function DetailsSheet({
 }
 
 export function PlayerScreen() {
-  const {isVisible, track, closePlayer, hidePlayer, openPlayer} = usePlayer();
+  const {
+    isVisible,
+    track,
+    closePlayer,
+    hidePlayer,
+    openPlayer,
+    playbackProblem,
+    retryPlayback,
+    dismissPlaybackProblem,
+  } = usePlayer();
   const {top, bottom} = useSafeAreaInsets();
+  const {width: winW, height: winH} = useWindowDimensions();
   const {isFavorite, toggleFavorite} = useFavorites();
   const t = useUIStrings();
   const [showSavedToast, setShowSavedToast] = useState(false);
+
+  // Адаптивная вёрстка: высота видимой части шторки измеряется (растёт вместе
+  // с размером шрифта), обложка получает всё свободное место между шапкой и
+  // кнопками. На низких экранах отступы между блоками тоже меньше.
+  const [sheetHeaderH, setSheetHeaderH] = useState(DEFAULT_HEADER_H + bottom);
+  const compact = winH < 820;
+  const contentGap = winH < 700 ? 12 : compact ? 16 : 24;
+  const contentTop = compact ? 16 : 40;
+  const coverCap = Math.min(COVER_MAX, winW - 48);
+  const [coverSize, setCoverSize] = useState(() =>
+    Math.max(COVER_MIN, Math.min(coverCap, winH - 572)),
+  );
+  const onCoverAreaLayout = useCallback(
+    (e: {nativeEvent: {layout: {height: number}}}) => {
+      const next = Math.max(
+        COVER_MIN,
+        Math.min(coverCap, Math.floor(e.nativeEvent.layout.height)),
+      );
+      setCoverSize(prev => (Math.abs(prev - next) > 1 ? next : prev));
+    },
+    [coverCap],
+  );
   const [shareOpen, setShareOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -783,7 +988,11 @@ export function PlayerScreen() {
             a subtle dark tint upper-right fading to pale blue lower-left. */}
         <LinearGradient
           pointerEvents="none"
-          colors={['rgba(10,44,67,0.2)', 'rgba(10,44,67,0.2)', 'rgba(191,220,240,0.2)']}
+          colors={[
+            'rgba(10,44,67,0.2)',
+            'rgba(10,44,67,0.2)',
+            'rgba(191,220,240,0.2)',
+          ]}
           locations={[0, 0.58, 1]}
           start={{x: 0.78, y: 0.09}}
           end={{x: 0.22, y: 0.91}}
@@ -818,39 +1027,52 @@ export function PlayerScreen() {
         </View>
 
         {/* Main scroll content */}
-        <View style={[styles.content, {paddingBottom: DEFAULT_HEADER_H + bottom + 8}]}>
-          {/* Cover art */}
-          <View style={styles.coverGlow}>
-            <RemoteImage
-              source={{uri: track.coverUrl}}
-              style={styles.cover}
-              resizeMode="cover"
-            />
+        <View
+          style={[
+            styles.content,
+            {
+              gap: contentGap,
+              paddingTop: contentTop,
+              paddingBottom: sheetHeaderH + 8,
+            },
+          ]}>
+          {/* Cover art — flex-блок забирает всё свободное место, обложка
+              вписывается в него квадратом (см. COVER_MIN/COVER_MAX). */}
+          <View style={styles.coverArea} onLayout={onCoverAreaLayout}>
+            <View
+              style={[styles.coverGlow, {width: coverSize, height: coverSize}]}>
+              <RemoteImage
+                source={{uri: track.coverUrl}}
+                style={[styles.cover, {width: coverSize, height: coverSize}]}
+                resizeMode="cover"
+              />
+            </View>
           </View>
 
           {/* Title row */}
           <View style={styles.titleRow}>
             <View style={styles.titleCol}>
-              <Text style={styles.title} numberOfLines={2}>
+              <Text
+                style={styles.title}
+                numberOfLines={2}
+                maxFontSizeMultiplier={MAX_FONT_SCALE}>
                 {track.title}
               </Text>
               {!!subtitle && (
-                <Text style={styles.subtitle} numberOfLines={1}>
+                <Text
+                  style={styles.subtitle}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={MAX_FONT_SCALE}>
                   {subtitle}
                 </Text>
               )}
             </View>
             {!!favKind && (
-              <TouchableOpacity
-                activeOpacity={0.8}
+              <HeartButton
+                liked={fav}
+                onPress={onHeartPress}
                 style={styles.heartBtn}
-                onPress={onHeartPress}>
-                <SvgXml
-                  xml={fav ? ICON_HEART_FILLED : ICON_HEART}
-                  width={24}
-                  height={24}
-                />
-              </TouchableOpacity>
+              />
             )}
           </View>
 
@@ -862,7 +1084,11 @@ export function PlayerScreen() {
         </View>
 
         {/* Bottom sheet */}
-        <DetailsSheet description={track.description} track={track} />
+        <DetailsSheet
+          description={track.description}
+          track={track}
+          onHeaderHeight={setSheetHeaderH}
+        />
 
         {/* «Сохранено» banner (design 448:13206) — overlays the header row
             after the track is added to favorites. */}
@@ -893,6 +1119,38 @@ export function PlayerScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setShowSavedToast(false)}
+              style={styles.savedToastClose}>
+              <SvgXml xml={ICON_CLOSE} width={24} height={24} />
+            </TouchableOpacity>
+          </View>
+        )}
+        {/* Практика не запустилась (оба зеркала/зависшая загрузка) — та же
+            плашка, что и «Сохранено», с кнопкой «Повторить». */}
+        {playbackProblem && !showSavedToast && (
+          <View style={[styles.savedToast, {top: top + 7}]}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.savedToastCol}
+              onPress={() => {
+                retryPlayback().catch(() => {});
+              }}>
+              <Text style={styles.savedToastTitle}>
+                {playbackProblem === 'stall'
+                  ? t('player_stall_title', 'Загрузка затянулась')
+                  : t('player_error_title', 'Не удалось запустить практику')}
+              </Text>
+              <View style={styles.savedToastRow}>
+                <Text style={styles.savedToastSub}>
+                  {t('player_error_sub', 'Проверьте интернет.')}
+                </Text>
+                <Text style={styles.savedToastLink}>
+                  {t('player_error_retry', 'Повторить')}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={dismissPlaybackProblem}
               style={styles.savedToastClose}>
               <SvgXml xml={ICON_CLOSE} width={24} height={24} />
             </TouchableOpacity>
@@ -1120,13 +1378,17 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     alignItems: 'center',
-    gap: 24,
-    paddingTop: 40,
-    paddingBottom: 20,
+  },
+  coverArea: {
+    flex: 1,
+    minHeight: COVER_MIN,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   coverGlow: {
-    width: 280,
-    height: 280,
+    width: COVER_MAX,
+    height: COVER_MAX,
     borderRadius: 20,
     ...Platform.select({
       ios: {
@@ -1141,8 +1403,8 @@ const styles = StyleSheet.create({
     }),
   },
   cover: {
-    width: 280,
-    height: 280,
+    width: COVER_MAX,
+    height: COVER_MAX,
     borderRadius: 20,
   },
   titleRow: {
