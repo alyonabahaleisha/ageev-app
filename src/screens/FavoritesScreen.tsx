@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {FitText} from '../components/FitText';
 import {Text} from '../components/Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -160,9 +161,9 @@ function AffirmationFavCard({
           pointerEvents="none"
         />
         <View style={styles.affContent}>
-          <Text style={styles.affText} numberOfLines={3}>
+          <FitText style={styles.affText} minFontSize={13} maxLines={3}>
             {item.title}
-          </Text>
+          </FitText>
           <View style={styles.affIcons}>
             <TouchableOpacity
               activeOpacity={0.7}

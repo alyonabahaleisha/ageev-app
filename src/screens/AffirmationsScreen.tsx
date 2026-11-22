@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {FitText} from '../components/FitText';
 import {Text} from '../components/Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -47,12 +48,10 @@ const HINT_BOTTOM_RATIO = (844 - 714) / 844; // 130/844
 
 const ALL_FILTER = 'Все';
 
-// Правки (Figma 489:11217): размер текста в карточках единый — 22px, без
-// подстройки под длину. Пользовательский «Размер текста» применяет общий
-// компонент Text.
-function fontForText(_text: string): {fontSize: number; lineHeight: number} {
-  return {fontSize: 22, lineHeight: 30};
-}
+// Правки (Figma 489:11217): размер текста в карточках единый — 22px.
+// Длинная аффирмация, которая в отведённое место не помещается, уменьшает
+// кегль сама (FitText), а не обрезается; «Размер текста» применяет Text.
+const ACTIONS_ROW_H = 28 + 24; // отступ + иконки под текстом
 
 type Props = {
   onBack: () => void;
@@ -248,9 +247,12 @@ export function AffirmationsScreen({onBack, initial}: Props) {
                 styles.textBox,
                 {top: textBoxTop, bottom: textBoxBottom},
               ]}>
-              <Text style={[styles.affirmationText, fontForText(item.text)]}>
+              <FitText
+                style={styles.affirmationText}
+                minFontSize={15}
+                maxHeight={pageH - textBoxTop - textBoxBottom - ACTIONS_ROW_H}>
                 {item.text}
-              </Text>
+              </FitText>
               <View style={styles.actionsRow}>
                 <TouchableOpacity
                   activeOpacity={0.7}

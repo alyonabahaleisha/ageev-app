@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {FitText} from '../FitText';
 import {Text} from '../Text';
 import Svg, {Defs, RadialGradient, Rect, Stop, SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -24,6 +25,8 @@ import {colors} from '../../theme/colors';
 import {typography} from '../../theme/typography';
 
 const MARGIN = 24;
+// Room kept below the affirmation text: icon row, gap and the bottom edge.
+const STORY_TEXT_BOTTOM = 200;
 const {width: SCREEN_W, height: SCREEN_H} = Dimensions.get('window');
 const CTA_HEIGHT = 52;
 
@@ -192,13 +195,16 @@ function AffirmationSlide({onReady, content}: SlideProps) {
       </Text>
       <View style={[styles.centerBlock, {top: top + 297}]}>
         {/* Правки (Figma 489:11217): текст в карточках единый — 22px. */}
-        <Text style={styles.h1Mid}>
+        <FitText
+          style={styles.h1Mid}
+          minFontSize={15}
+          maxHeight={SCREEN_H - (top + 297) - STORY_TEXT_BOTTOM}>
           {affirmation?.text ||
             t(
               'story_affirmation_fallback',
               'Я доверяю жизни и чувствую поддержку в каждом шаге',
             )}
-        </Text>
+        </FitText>
         <View style={styles.iconRow}>
           <TouchableOpacity
             activeOpacity={0.7}

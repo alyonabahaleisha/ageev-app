@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {FitText} from './FitText';
 import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {ICON_AFFIRMATION} from '../assets/icons';
@@ -52,9 +53,9 @@ export function AffirmationCard({onPress}: {onPress?: () => void}) {
           {isLong ? (
             <>
               <View style={[styles.quoteContainer, styles.quoteContainerLong]}>
-                <Text style={styles.quote} numberOfLines={4}>
+                <FitText style={styles.quote} minFontSize={15} maxLines={4}>
                   {text}
-                </Text>
+                </FitText>
                 <View style={styles.moreWrap}>
                   <Text style={styles.more}>
                     {t('home_affirmation_more', 'Читать полностью')}

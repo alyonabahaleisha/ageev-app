@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {FitText} from './FitText';
 import {Text} from './Text';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -38,6 +39,8 @@ export type ShareAffirmationItem = {
 
 const CARD_W = 210;
 const CARD_H = 450;
+// Room on the card not available to the affirmation text (footer, margins).
+const CARD_TEXT_MARGIN = 130;
 
 // Общий каркас: шапка с крестиком, превью-карточка (она же снимается в
 // картинку) и кнопка системного листа. Ссылка на приложение уходит текстом
@@ -196,7 +199,12 @@ export function ShareAffirmationModal({
         pointerEvents="none"
       />
       <View style={styles.cardTextBox}>
-        <Text style={styles.cardText}>{item.text}</Text>
+        <FitText
+          style={styles.cardText}
+          minFontSize={8}
+          maxHeight={CARD_H - CARD_TEXT_MARGIN}>
+          {item.text}
+        </FitText>
       </View>
       <CardFooter link={t('share_app_link', 'mikhail-ageev.ru')} />
     </ShareModalShell>

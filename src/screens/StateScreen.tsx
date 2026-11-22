@@ -45,8 +45,9 @@ import {colors} from '../theme/colors';
 import {fonts, typography} from '../theme/typography';
 import {useBackHandler} from '../hooks/useBackHandler';
 import {Presented} from '../components/Presented';
+import {FitText} from '../components/FitText';
 
-const {width: SCREEN_W} = Dimensions.get('window');
+const {width: SCREEN_W, height: SCREEN_H} = Dimensions.get('window');
 const FLOW_Z = 20; // above the screen's fixed header (zIndex 10)
 const SECTION_MARGIN = 24;
 const MEDIA_W = 280;
@@ -347,9 +348,12 @@ export function StateScreen({state, onBack}: Props) {
                         />
                         <View style={styles.affCardInner}>
                           <View style={styles.affTextBlock}>
-                            <Text style={styles.affText} numberOfLines={2}>
+                            <FitText
+                              style={styles.affText}
+                              minFontSize={13}
+                              maxLines={2}>
                               {a.text}
-                            </Text>
+                            </FitText>
                             <View style={styles.affMoreWrap}>
                               <Text style={styles.affMore}>
                                 {t(
@@ -603,14 +607,8 @@ export function StateScreen({state, onBack}: Props) {
 }
 
 // ── Immersive affirmation pager ──────────────────────────────────────────────
-function fontForText(text: string): {fontSize: number; lineHeight: number} {
-  const len = text.length;
-  if (len <= 60) return {fontSize: 26, lineHeight: 34};
-  if (len <= 120) return {fontSize: 23, lineHeight: 31};
-  if (len <= 220) return {fontSize: 20, lineHeight: 27};
-  if (len <= 340) return {fontSize: 18, lineHeight: 24};
-  return {fontSize: 16, lineHeight: 22};
-}
+// Room kept clear above and below the text (close button, breathing space).
+const FLOW_TEXT_MARGIN = 150;
 
 function AffirmationFlow({
   items,
@@ -633,7 +631,6 @@ function AffirmationFlow({
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         renderItem={({item}) => {
-          const f = fontForText(item.text);
           const pageBg = item.background || background;
           return (
             <View style={styles.flowPage}>
@@ -652,13 +649,12 @@ function AffirmationFlow({
                   styles.flowPageInner,
                   {paddingTop: top, paddingBottom: bottom},
                 ]}>
-                <Text
-                  style={[
-                    styles.flowText,
-                    {fontSize: f.fontSize, lineHeight: f.lineHeight},
-                  ]}>
+                <FitText
+                  style={styles.flowText}
+                  minFontSize={15}
+                  maxHeight={SCREEN_H - top - bottom - FLOW_TEXT_MARGIN}>
                   {item.text}
-                </Text>
+                </FitText>
               </View>
             </View>
           );
