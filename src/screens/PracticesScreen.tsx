@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
+  Animated,
   Dimensions,
   Image,
   Platform,
@@ -17,7 +18,8 @@ import {MeditationsScreen} from './MeditationsScreen';
 import {WebinarsScreen} from './WebinarsScreen';
 import {AffirmationsScreen} from './AffirmationsScreen';
 import {BreakfastsScreen} from './BreakfastsScreen';
-import {GradientBackground} from '../components/GradientBackground';
+import {Presented, useRecede} from '../components/Presented';
+import {useScrollMemory} from '../hooks/useScrollMemory';
 import {FixedHeader, useHeaderScrollPadding} from '../components/FixedHeader';
 import {useBreakfasts} from '../services/breakfasts';
 import {useSearch} from '../context/SearchContext';
@@ -97,6 +99,9 @@ function FormatChip({
   );
 }
 
+// Above the list's fixed header (zIndex 10), below the tab bar.
+const SUB_SCREEN_Z = 20;
+
 type FormatSignal = {
   id: 'meditations' | 'affirmations' | 'webinars' | 'breakfasts';
   n: number;
@@ -121,7 +126,24 @@ export function PracticesScreen({
   // mounted), so the Завтраки grid opens with its images already cached.
   useBreakfasts();
 
+  const scrollMemory = useScrollMemory('practices', scrollRef);
+  // Arrival of each sub-screen (0→1); the list recedes in step with them.
+  const pages = useRef({
+    meditations: new Animated.Value(0),
+    webinars: new Animated.Value(0),
+    breakfasts: new Animated.Value(0),
+    affirmations: new Animated.Value(0),
+  }).current;
+  const recede = useRecede(Object.values(pages));
+
+  // Повторный тап по вкладке — к списку и наверх. При монтировании не
+  // срабатывает: вкладка возвращается на то место, где её оставили.
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     setSubScreen('list');
     scrollRef.current?.scrollTo({y: 0, animated: true});
   }, [resetSignal]);
@@ -133,10 +155,13 @@ export function PracticesScreen({
     }
   }, [formatSignal]);
 
+  const backToList = () => setSubScreen('list');
+
   return (
     <>
+      <Animated.View style={[styles.listLayer, recede]}>
       <ScrollView
-        ref={scrollRef}
+        {...scrollMemory}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
@@ -183,48 +208,61 @@ export function PracticesScreen({
         <View style={{height: bottom + 110}} />
       </ScrollView>
 
-      {/* Fixed header — only over the list, not the full-screen sub-screens */}
-      {subScreen === 'list' && (
-        <FixedHeader>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>{t('practices_title', 'Практики')}</Text>
-            <View style={styles.searchGlow}>
-              <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn} onPress={openSearch}>
-                <SvgXml xml={ICON_SEARCH} width={24} height={24} />
-              </TouchableOpacity>
-            </View>
+      {/* Fixed header of the list. It stays mounted under the sub-screens so
+          it is there to see while one slides in or is swiped back. */}
+      <FixedHeader>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>{t('practices_title', 'Практики')}</Text>
+          <View style={styles.searchGlow}>
+            <TouchableOpacity activeOpacity={0.8} style={styles.searchBtn} onPress={openSearch}>
+              <SvgXml xml={ICON_SEARCH} width={24} height={24} />
+            </TouchableOpacity>
           </View>
-        </FixedHeader>
-      )}
-
-      {subScreen === 'meditations' && (
-        <GradientBackground style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
-          <MeditationsScreen onBack={() => setSubScreen('list')} />
-        </GradientBackground>
-      )}
-
-      {subScreen === 'webinars' && (
-        <GradientBackground style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
-          <WebinarsScreen onBack={() => setSubScreen('list')} />
-        </GradientBackground>
-      )}
-
-      {subScreen === 'breakfasts' && (
-        <GradientBackground style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
-          <BreakfastsScreen onBack={() => setSubScreen('list')} />
-        </GradientBackground>
-      )}
-
-      {subScreen === 'affirmations' && (
-        <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}}>
-          <AffirmationsScreen onBack={() => setSubScreen('list')} />
         </View>
-      )}
+      </FixedHeader>
+      </Animated.View>
+
+      {/* Sub-screens slide in over the list (zIndex lifts them above its
+          fixed header) and slide back out; on iOS they swipe back from the
+          left edge. Аффирмации page sideways themselves, so no edge swipe. */}
+      <Presented
+        shown={subScreen === 'meditations'}
+        progress={pages.meditations}
+        zIndex={SUB_SCREEN_Z}
+        onSwipeBack={backToList}>
+        <MeditationsScreen onBack={backToList} />
+      </Presented>
+
+      <Presented
+        shown={subScreen === 'webinars'}
+        progress={pages.webinars}
+        zIndex={SUB_SCREEN_Z}
+        onSwipeBack={backToList}>
+        <WebinarsScreen onBack={backToList} />
+      </Presented>
+
+      <Presented
+        shown={subScreen === 'breakfasts'}
+        progress={pages.breakfasts}
+        zIndex={SUB_SCREEN_Z}
+        onSwipeBack={backToList}>
+        <BreakfastsScreen onBack={backToList} />
+      </Presented>
+
+      <Presented
+        shown={subScreen === 'affirmations'}
+        progress={pages.affirmations}
+        zIndex={SUB_SCREEN_Z}>
+        <AffirmationsScreen onBack={backToList} />
+      </Presented>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  listLayer: {
+    flex: 1,
+  },
   scroll: {
     flex: 1,
   },

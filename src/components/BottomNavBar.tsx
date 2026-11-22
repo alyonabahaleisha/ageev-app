@@ -1,25 +1,23 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
+  Animated,
   Dimensions,
+  Easing,
   Platform,
+  Pressable,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import {Text} from './Text';
 import {BlurView} from '@react-native-community/blur';
-import {SvgXml} from 'react-native-svg';
+import Svg, {Circle, Defs, RadialGradient, Stop} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useOnPlay} from '../services/motion';
+import {useReduceMotion} from '../services/reduceMotion';
 import {useUIStrings} from '../services/uiStrings';
-import {
-  ICON_HOME,
-  ICON_LAMP,
-  ICON_PLAY_CIRCLE,
-  ICON_PEOPLE,
-  ICON_PROFILE_CIRCLE,
-} from '../assets/icons';
 import {colors} from '../theme/colors';
 import {typography} from '../theme/typography';
+import {TabIcon, TabIconName} from './TabIcons';
 
 // ─── Figma-exact constants ────────────────────────────────────────────────────
 const {width: SCREEN_W} = Dimensions.get('window');
@@ -37,21 +35,212 @@ const CIRCLE_SIZE = 65; // 65×65 from Figma (Frame 24)
 const CIRCLE_ABOVE_PILL = 32; // circle top is 32px above pill top (y:15 vs y:47 in Frame 311)
 const PILL_BORDER_RADIUS = 50;
 const CIRCLE_TAB_INDEX = 2; // only the center tab (Практики) gets the floating circle
+const WAVE_SIZE = CIRCLE_SIZE * 2; // the circle's wave at its widest
+const INACTIVE_OPACITY = 0.6;
 
-type Tab = {key: string; label: string; icon: string};
+type Tab = {key: TabIconName; label: string};
 
 const TABS: Tab[] = [
-  {key: 'home', label: 'Главная', icon: ICON_HOME},
-  {key: 'thinking', label: 'Мышление', icon: ICON_LAMP},
-  {key: 'practices', label: 'Практики', icon: ICON_PLAY_CIRCLE},
-  {key: 'club', label: 'Клуб', icon: ICON_PEOPLE},
-  {key: 'profile', label: 'Профиль', icon: ICON_PROFILE_CIRCLE},
+  {key: 'home', label: 'Главная'},
+  {key: 'thinking', label: 'Мышление'},
+  {key: 'practices', label: 'Практики'},
+  {key: 'club', label: 'Клуб'},
+  {key: 'profile', label: 'Профиль'},
 ];
 
 // Circle left offset relative to the pill's left edge
 function circleLeft(index: number): number {
   const tabCenterX = PILL_H_PAD + index * (TAB_W + TAB_GAP) + TAB_W / 2;
   return tabCenterX - CIRCLE_SIZE / 2;
+}
+
+// ─── Tap feedback (all native-driver) ────────────────────────────────────────
+/**
+ * The control sinks under the finger and springs back on release, passing
+ * its resting size once before it settles. Returns the scale to apply.
+ */
+function usePressSpring(depth: number) {
+  const pressed = useRef(new Animated.Value(0)).current;
+  const onPressIn = () =>
+    Animated.timing(pressed, {
+      toValue: 1,
+      duration: 90,
+      easing: Easing.out(Easing.quad),
+      isInteraction: false,
+      useNativeDriver: true,
+    }).start();
+  const onPressOut = () =>
+    Animated.spring(pressed, {
+      toValue: 0,
+      stiffness: 300,
+      damping: 14,
+      mass: 1,
+      isInteraction: false,
+      useNativeDriver: true,
+    }).start();
+  const scale = pressed.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1 - depth],
+  });
+  return {scale, onPressIn, onPressOut};
+}
+
+/** 0.6 → 1 as the tab becomes active; a soft fade instead of a hard switch. */
+function useActiveFade(active: boolean) {
+  const on = useRef(new Animated.Value(active ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(on, {
+      toValue: active ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.quad),
+      isInteraction: false,
+      useNativeDriver: true,
+    }).start();
+  }, [active, on]);
+  return on.interpolate({
+    inputRange: [0, 1],
+    outputRange: [INACTIVE_OPACITY, 1],
+  });
+}
+
+// ─── Tab in the pill ─────────────────────────────────────────────────────────
+function TabButton({
+  tab,
+  label,
+  active,
+  iconHidden,
+  play,
+  onPress,
+}: {
+  tab: Tab;
+  label: string;
+  active: boolean;
+  /** The centre tab's icon lives in the floating circle instead. */
+  iconHidden: boolean;
+  play: number;
+  onPress: () => void;
+}) {
+  const {scale, onPressIn, onPressOut} = usePressSpring(0.07);
+  const opacity = useActiveFade(active);
+
+  return (
+    <Pressable
+      style={styles.tabItem}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{selected: active}}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={onPress}>
+      <Animated.View
+        style={[styles.tabContent, {opacity, transform: [{scale}]}]}>
+        <View style={[styles.iconSlot, iconHidden && styles.iconSlotHidden]}>
+          <TabIcon name={tab.key} size={ICON_SIZE} play={play} />
+        </View>
+        <Text style={styles.label} numberOfLines={1}>
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// ─── Floating circle (Практики) ──────────────────────────────────────────────
+/**
+ * The circle's wave: a soft ring of light, brightest at its rim and feathered
+ * on both sides. Drawn at its widest size and only ever shown smaller, so it
+ * stays smooth.
+ */
+function Wave() {
+  return (
+    <Svg width={WAVE_SIZE} height={WAVE_SIZE} viewBox="0 0 100 100">
+      <Defs>
+        <RadialGradient
+          id="wave"
+          cx="50"
+          cy="50"
+          r="50"
+          gradientUnits="userSpaceOnUse">
+          <Stop offset="0.62" stopColor="#FFFFFF" stopOpacity={0} />
+          <Stop offset="0.9" stopColor="#FFFFFF" stopOpacity={0.7} />
+          <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx="50" cy="50" r="50" fill="url(#wave)" />
+    </Svg>
+  );
+}
+
+function CircleButton({
+  tab,
+  label,
+  active,
+  play,
+  onPress,
+}: {
+  tab: Tab;
+  label: string;
+  active: boolean;
+  play: number;
+  onPress: () => void;
+}) {
+  const {scale, onPressIn, onPressOut} = usePressSpring(0.06);
+  const wave = useRef(new Animated.Value(1)).current;
+  useOnPlay(play, () => {
+    wave.setValue(0);
+    return Animated.timing(wave, {
+      toValue: 1,
+      duration: 760,
+      easing: Easing.out(Easing.cubic),
+      isInteraction: false,
+      useNativeDriver: true,
+    });
+  });
+
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[styles.circleAnchor, {left: circleLeft(CIRCLE_TAB_INDEX)}]}>
+      {/* One wave leaves from under the circle's rim and fades as it widens. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.wave,
+          {
+            opacity: wave.interpolate({
+              inputRange: [0, 0.15, 1],
+              outputRange: [0, 1, 0],
+            }),
+            transform: [
+              {
+                scale: wave.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.52, 0.94],
+                }),
+              },
+            ],
+          },
+        ]}>
+        <Wave />
+      </Animated.View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{selected: active}}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={onPress}>
+        <Animated.View
+          style={[
+            styles.activeCircle,
+            active && styles.activeCircleLit,
+            {transform: [{scale}]},
+          ]}>
+          <TabIcon name={tab.key} size={ICON_SIZE} play={play} />
+        </Animated.View>
+      </Pressable>
+    </View>
+  );
 }
 
 type Props = {
@@ -64,8 +253,14 @@ export function BottomNavBar({activeIndex: controlledIndex, onTabPress}: Props) 
   const activeIndex = controlledIndex ?? internalIndex;
   const insets = useSafeAreaInsets();
   const t = useUIStrings();
+  const reduceMotion = useReduceMotion();
+  // One counter per tab; bumping it plays that tab's tap response.
+  const [plays, setPlays] = useState(() => TABS.map(() => 0));
 
   function handlePress(index: number) {
+    if (!reduceMotion) {
+      setPlays(prev => prev.map((n, i) => (i === index ? n + 1 : n)));
+    }
     if (controlledIndex === undefined) setInternalIndex(index);
     onTabPress?.(index);
   }
@@ -99,29 +294,18 @@ export function BottomNavBar({activeIndex: controlledIndex, onTabPress}: Props) 
           {/* Semi-transparent overlay: rgba(255,255,255,0.14) from Figma */}
           <View style={styles.pillOverlay} />
           <View style={styles.tabRow}>
-            {TABS.map((tab, index) => {
-              const isActive = index === activeIndex;
-              // Center tab icon always lives in the floating circle
-              const iconInCircle = index === CIRCLE_TAB_INDEX;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  style={styles.tabItem}
-                  activeOpacity={0.8}
-                  onPress={() => handlePress(index)}>
-                  <View style={[styles.iconSlot, iconInCircle && styles.iconSlotHidden]}>
-                    <View style={!isActive && styles.iconInactive}>
-                      <SvgXml xml={tab.icon} width={ICON_SIZE} height={ICON_SIZE} />
-                    </View>
-                  </View>
-                  <Text
-                    style={[styles.label, !isActive && styles.labelInactive]}
-                    numberOfLines={1}>
-                    {t(`nav_${tab.key}`, tab.label)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+            {TABS.map((tab, index) => (
+              <TabButton
+                key={tab.key}
+                tab={tab}
+                label={t(`nav_${tab.key}`, tab.label)}
+                active={index === activeIndex}
+                // Center tab icon always lives in the floating circle
+                iconHidden={index === CIRCLE_TAB_INDEX}
+                play={plays[index]}
+                onPress={() => handlePress(index)}
+              />
+            ))}
           </View>
         </View>
       </View>
@@ -129,16 +313,16 @@ export function BottomNavBar({activeIndex: controlledIndex, onTabPress}: Props) 
       {/* Floating circle — always visible for center tab (Практики).
           It overlays the center tab's touchable, so it must handle the press
           itself and route to the same tab. */}
-      <TouchableOpacity
-        activeOpacity={0.8}
+      <CircleButton
+        tab={TABS[CIRCLE_TAB_INDEX]}
+        label={t(
+          `nav_${TABS[CIRCLE_TAB_INDEX].key}`,
+          TABS[CIRCLE_TAB_INDEX].label,
+        )}
+        active={activeIndex === CIRCLE_TAB_INDEX}
+        play={plays[CIRCLE_TAB_INDEX]}
         onPress={() => handlePress(CIRCLE_TAB_INDEX)}
-        style={[
-          styles.activeCircle,
-          {left: circleLeft(CIRCLE_TAB_INDEX)},
-          activeIndex === CIRCLE_TAB_INDEX && styles.activeCircleLit,
-        ]}>
-        <SvgXml xml={TABS[CIRCLE_TAB_INDEX].icon} width={ICON_SIZE} height={ICON_SIZE} />
-      </TouchableOpacity>
+      />
     </View>
   );
 }
@@ -183,6 +367,8 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     width: TAB_W,
+  },
+  tabContent: {
     alignItems: 'center',
     gap: TAB_ICON_GAP,
   },
@@ -195,20 +381,25 @@ const styles = StyleSheet.create({
   iconSlotHidden: {
     opacity: 0,
   },
-  iconInactive: {
-    opacity: 0.6,
-  },
   label: {
     ...typography.label,
     color: colors.white,
     textAlign: 'center',
   },
-  labelInactive: {
-    opacity: 0.6,
-  },
-  activeCircle: {
+  circleAnchor: {
     position: 'absolute',
     top: 0,
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+  },
+  wave: {
+    position: 'absolute',
+    left: (CIRCLE_SIZE - WAVE_SIZE) / 2,
+    top: (CIRCLE_SIZE - WAVE_SIZE) / 2,
+    width: WAVE_SIZE,
+    height: WAVE_SIZE,
+  },
+  activeCircle: {
     width: CIRCLE_SIZE,
     height: CIRCLE_SIZE,
     borderRadius: CIRCLE_SIZE / 2,

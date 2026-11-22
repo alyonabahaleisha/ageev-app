@@ -1,6 +1,5 @@
-import React, {useCallback, useEffect, useRef} from 'react';
+import React, {useEffect} from 'react';
 import {
-  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -87,22 +86,7 @@ export function SettingsScreen({onBack}: Props) {
   const [region, setRegion] = React.useState(getRegion());
   useEffect(() => subscribeRegion(() => setRegion(getRegion())), []);
 
-  // Плавное появление/закрытие вместо резкой смены экрана.
-  const fade = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(fade, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-  }, [fade]);
-  const handleBack = useCallback(() => {
-    Animated.timing(fade, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => onBack());
-  }, [fade, onBack]);
+  // Появление и закрытие анимирует обёртка <Presented> в App.tsx.
 
   const reminderTimes: {key: ReminderTime; label: string}[] = [
     {key: 'morning', label: t('settings_reminder_morning', 'Утро')},
@@ -124,7 +108,7 @@ export function SettingsScreen({onBack}: Props) {
   }
 
   return (
-    <Animated.View style={[styles.fadeRoot, {opacity: fade}]}>
+    <View style={styles.fadeRoot}>
       <GradientBackground>
         <ScrollView
           style={styles.scroll}
@@ -325,7 +309,7 @@ export function SettingsScreen({onBack}: Props) {
           <View style={styles.header}>
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={handleBack}
+              onPress={onBack}
               style={styles.backBtn}>
               <SvgXml xml={ICON_BACK} width={24} height={24} />
             </TouchableOpacity>
@@ -336,7 +320,7 @@ export function SettingsScreen({onBack}: Props) {
           </View>
         </FixedHeader>
       </GradientBackground>
-    </Animated.View>
+    </View>
   );
 }
 

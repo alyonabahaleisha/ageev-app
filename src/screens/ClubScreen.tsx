@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import {Text} from '../components/Text';
+import {useScrollMemory} from '../hooks/useScrollMemory';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
@@ -61,6 +62,7 @@ type Props = {onOpenMap: () => void; onClose: () => void};
 export function ClubScreen({onOpenMap, onClose}: Props) {
   const {top, bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
+  const scrollMemory = useScrollMemory('club');
   const {clubs} = useClubs();
   const t = useUIStrings();
   const [query, setQuery] = useState('');
@@ -227,6 +229,7 @@ export function ClubScreen({onOpenMap, onClose}: Props) {
   return (
     <>
       <ScrollView
+        {...scrollMemory}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,

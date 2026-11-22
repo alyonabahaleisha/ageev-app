@@ -44,8 +44,10 @@ import {useWebinars} from '../services/webinars';
 import {colors} from '../theme/colors';
 import {fonts, typography} from '../theme/typography';
 import {useBackHandler} from '../hooks/useBackHandler';
+import {Presented} from '../components/Presented';
 
 const {width: SCREEN_W} = Dimensions.get('window');
+const FLOW_Z = 20; // above the screen's fixed header (zIndex 10)
 const SECTION_MARGIN = 24;
 const MEDIA_W = 280;
 const MEDIA_H = 170;
@@ -570,21 +572,23 @@ export function StateScreen({state, onBack}: Props) {
         </View>
       </FixedHeader>
 
-      {flowOpen && (
+      {/* Погружения (аффирмации, упражнение) проявляются из лёгкого зума,
+          а не появляются мгновенно; zIndex — выше fixed-шапки экрана. */}
+      <Presented shown={flowOpen} kind="zoom" zIndex={FLOW_Z}>
         <AffirmationFlow
           items={state.affirmations}
           background={affBg}
           onClose={() => setFlowOpen(false)}
         />
-      )}
+      </Presented>
 
-      {exerciseOpen && (
+      <Presented shown={exerciseOpen} kind="zoom" zIndex={FLOW_Z}>
         <ExerciseFlow
           exercise={ex}
           backgroundUrl={exerciseImage}
           onClose={() => setExerciseOpen(false)}
         />
-      )}
+      </Presented>
 
       {/* «Сохранено» — как в плеере (448:13206), поверх шапки */}
       {toast.visible && <SavedToast top={top + 7} onClose={toast.hide} />}

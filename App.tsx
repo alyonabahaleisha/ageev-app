@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {
   Animated,
   Linking,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -25,6 +26,8 @@ import {
   useHeaderScrollPadding,
 } from './src/components/FixedHeader';
 import {MiniPlayer} from './src/components/MiniPlayer';
+import {Presented, useRecede} from './src/components/Presented';
+import {useScrollMemory} from './src/hooks/useScrollMemory';
 import {AboutAppBlock} from './src/components/AboutAppBlock';
 import {AffirmationCard} from './src/components/AffirmationCard';
 import {AngelHelper} from './src/components/AngelHelper';
@@ -94,18 +97,55 @@ const VISIBLE = 1;
 // кадров, «Slow bitmap uploads» на каждом кадре). При 0 вкладка не рисуется.
 const HIDDEN = 0;
 const WELCOME_SEEN_KEY = 'welcome_seen_v1';
+// Порядок слоёв над нав-баром. Явный zIndex нужен, чтобы слой гарантированно
+// лежал выше fixed-шапок (zIndex 10) экранов под ним, пока те ещё смонтированы
+// на время перехода. Слои под нав-баром (состояние, аффирмации, «О школе»)
+// zIndex не получают — иначе всплыли бы над ним.
+const LAYER = {
+  map: 20,
+  favorites: 21,
+  settings: 22,
+  miniPlayer: 25,
+  favAffirmation: 30,
+  linkAffirmation: 31,
+  welcome: 32,
+  search: 33,
+  stories: 34,
+} as const;
+type CoverKey = 'map' | 'favorites' | 'settings' | 'search' | 'favAffirmation';
 // Длительности кроссфейда вкладок/оверлеев — резкая смена экранов «моргала».
 const FADE_IN_MS = 180;
 const FADE_OUT_MS = 150;
+// iOS: вкладка, в которую уже заходили, остаётся смонтированной (невидимой) —
+// возврат мгновенный, с тем же скроллом и открытым под-экраном. На Android
+// скрытые вкладки по-прежнему размонтируются: там это лечило просадку fps
+// (см. HIDDEN выше); позицию скролла восстанавливает useScrollMemory.
+const KEEP_TABS_ALIVE = Platform.OS === 'ios';
+// Входящая вкладка не просто проявляется, а чуть «усаживается» снизу вверх.
+const TAB_SETTLE = 8;
+const settle = (opacity: Animated.Value) => ({
+  opacity,
+  transform: [
+    {
+      translateY: opacity.interpolate({
+        inputRange: [0, 1],
+        outputRange: [TAB_SETTLE, 0],
+      }),
+    },
+  ],
+});
 
 /** Слот вкладки с плавным появлением/исчезновением: содержимое остаётся
  *  смонтированным на время фейд-аута, потом размонтируется (прежняя
  *  семантика «скрыт — значит размонтирован» сохраняется). */
 function FadeSlot({
   shown,
+  keepAlive = false,
   children,
 }: {
   shown: boolean;
+  /** Остаться смонтированным (невидимым) после скрытия. */
+  keepAlive?: boolean;
   children: React.ReactNode;
 }) {
   const [mounted, setMounted] = useState(shown);
@@ -124,14 +164,14 @@ function FadeSlot({
         duration: FADE_OUT_MS,
         useNativeDriver: true,
       }).start(({finished}) => {
-        if (finished) setMounted(false);
+        if (finished && !keepAlive) setMounted(false);
       });
     }
-  }, [shown, op]);
+  }, [shown, op, keepAlive]);
   if (!mounted) return null;
   return (
     <Animated.View
-      style={[styles.screenSlot, {opacity: op}]}
+      style={[styles.screenSlot, settle(op)]}
       pointerEvents={shown ? 'auto' : 'none'}>
       {children}
     </Animated.View>
@@ -199,6 +239,50 @@ function AppContent() {
   const [showSettings, setShowSettings] = useState(false);
   // Welcome — только при первом запуске (null, пока флаг не прочитан).
   const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
+
+  // Какие оверлеи уже полностью въехали и закрыли собой экран под ними.
+  // Экран под оверлеем размонтируется (паттерн overlay-zindex) не в момент
+  // открытия, а только когда оверлей его целиком закрыл, и возвращается, как
+  // только оверлей начал уезжать или его тянут свайпом, — поэтому во время
+  // перехода под уезжающим экраном виден настоящий экран, а не пустой фон.
+  const [arrived, setArrived] = useState<Partial<Record<CoverKey, boolean>>>(
+    {},
+  );
+  const cover = (key: CoverKey) => (value: boolean) =>
+    setArrived(prev => (!!prev[key] === value ? prev : {...prev, [key]: value}));
+  const covered = {
+    map: showClubMap && !!arrived.map,
+    favorites: showFavorites && !!arrived.favorites,
+    settings: showSettings && !!arrived.settings,
+    search: showSearch && !!arrived.search,
+    favAffirmation: !!favAffirmation && !!arrived.favAffirmation,
+  };
+  // Въезд каждой страницы (0→1): экран под ней в такт чуть уезжает влево —
+  // тот же признак глубины, что у нативного стека навигации.
+  const pages = useRef({
+    state: new Animated.Value(0),
+    affirmations: new Animated.Value(0),
+    school: new Animated.Value(0),
+    map: new Animated.Value(0),
+    favorites: new Animated.Value(0),
+    settings: new Animated.Value(0),
+    search: new Animated.Value(0),
+    favAffirmation: new Animated.Value(0),
+  }).current;
+  const recede = useRecede(Object.values(pages));
+  const homeScrollMemory = useScrollMemory('home', homeScrollRef);
+  // Вкладки, в которые уже заходили (см. KEEP_TABS_ALIVE).
+  const visitedTabs = useRef(new Set<number>()).current;
+  visitedTabs.add(activeTab);
+  const tabAlive = (index: number) =>
+    activeTab === index || (KEEP_TABS_ALIVE && visitedTabs.has(index));
+  const closeFavorites = () => {
+    setShowFavorites(false);
+    if (favoritesFromPlayerRef.current) {
+      favoritesFromPlayerRef.current = false;
+      reopenPlayer();
+    }
+  };
 
   useEffect(() => {
     AsyncStorage.getItem(WELCOME_SEEN_KEY)
@@ -344,13 +428,15 @@ function AppContent() {
   return (
     <SearchContext.Provider value={{openSearch: () => setShowSearch(true)}}>
       <GradientBackground>
+        {/* Слой вкладок: уезжает чуть влево, когда поверх въезжает страница. */}
+        <Animated.View style={[styles.screenSlot, recede]}>
         <Animated.View
-          style={[styles.screenSlot, {opacity: opacity0}]}
+          style={[styles.screenSlot, settle(opacity0)]}
           pointerEvents={activeTab !== 0 ? 'none' : 'auto'}>
-          {activeTab === 0 && (
+          {tabAlive(0) && (
             <>
               <ScrollView
-                ref={homeScrollRef}
+                {...homeScrollMemory}
                 style={styles.scroll}
                 contentContainerStyle={[
                   styles.content,
@@ -407,9 +493,9 @@ function AppContent() {
         </Animated.View>
 
         <Animated.View
-          style={[styles.screenSlot, {opacity: opacity1}]}
+          style={[styles.screenSlot, settle(opacity1)]}
           pointerEvents={activeTab !== 1 ? 'none' : 'auto'}>
-          {activeTab === 1 && (
+          {tabAlive(1) && (
             <BackHandlerActiveContext.Provider value={activeTab === 1}>
               <ThinkingScreen
                 resetSignal={thinkingReset}
@@ -420,9 +506,9 @@ function AppContent() {
         </Animated.View>
 
         <Animated.View
-          style={[styles.screenSlot, {opacity: opacity2}]}
+          style={[styles.screenSlot, settle(opacity2)]}
           pointerEvents={activeTab !== 2 ? 'none' : 'auto'}>
-          {activeTab === 2 && (
+          {tabAlive(2) && (
             <BackHandlerActiveContext.Provider value={activeTab === 2}>
               <PracticesScreen
                 resetSignal={practicesReset}
@@ -434,7 +520,9 @@ function AppContent() {
 
         {/* Club tab (index 3) — intro screen. Unmounted while the map overlay is
           open so its header can't flash over the map during the WebView load. */}
-        <FadeSlot shown={activeTab === 3 && !showClubMap && !linkAffirmation}>
+        <FadeSlot
+          keepAlive={KEEP_TABS_ALIVE}
+          shown={activeTab === 3 && !covered.map && !linkAffirmation}>
           <ClubScreen
             onOpenMap={() => setShowClubMap(true)}
             onClose={() => handleTabPress(0)}
@@ -445,11 +533,12 @@ function AppContent() {
           Unmounted while Избранное/Настройки are open: its fixed header
           has zIndex 10 and would float above the overlay otherwise. */}
         <FadeSlot
+          keepAlive={KEEP_TABS_ALIVE}
           shown={
             activeTab === 4 &&
-            !showFavorites &&
-            !showSettings &&
-            !showSearch &&
+            !covered.favorites &&
+            !covered.settings &&
+            !covered.search &&
             !linkAffirmation
           }>
           <ProfileScreen
@@ -457,57 +546,65 @@ function AppContent() {
             onOpenSettings={() => setShowSettings(true)}
           />
         </FadeSlot>
+        </Animated.View>
 
         {/* State detail — a top-level overlay so tapping a state card (from the
           home picker or the Мышление tab) opens it directly, without a tab jump.
           Unmounted while Избранное is open (тост «Сохранено» ведёт туда) — its
           fixed header has zIndex 10 and would float above the overlay. */}
-        {selectedState && !showFavorites && (
-          <View style={styles.screenSlot}>
-            <StateScreen
-              state={selectedState}
-              onBack={() => setSelectedState(null)}
-            />
-          </View>
+        {!covered.favorites && (
+          <Presented
+            shown={!!selectedState}
+            progress={pages.state}
+            onSwipeBack={() => setSelectedState(null)}>
+            {selectedState && (
+              <StateScreen
+                state={selectedState}
+                onBack={() => setSelectedState(null)}
+              />
+            )}
+          </Presented>
         )}
 
-        {showAffirmations && (
-          <View style={styles.screenSlot}>
-            <AffirmationsScreen onBack={() => setShowAffirmations(false)} />
-          </View>
-        )}
+        {/* Пейджер аффирмаций листается вбок сам — без свайпа «назад» от края. */}
+        <Presented shown={showAffirmations} progress={pages.affirmations}>
+          <AffirmationsScreen onBack={() => setShowAffirmations(false)} />
+        </Presented>
 
-        {showSchool && (
-          <View style={styles.screenSlot}>
-            <SchoolScreen onBack={() => setShowSchool(false)} />
-          </View>
-        )}
+        <Presented
+          shown={showSchool}
+          progress={pages.school}
+          onSwipeBack={() => setShowSchool(false)}>
+          <SchoolScreen onBack={() => setShowSchool(false)} />
+        </Presented>
 
         <BottomNavBar activeIndex={activeTab} onTabPress={handleTabPress} />
 
         {/* Full-screen clubs map opens from the Club tab, above the nav bar.
           Смонтирована скрыто с момента захода на вкладку «Клуб» (прогрев). */}
         {(mapPreheated || showClubMap) && (
-          <View
-            style={[styles.screenSlot, !showClubMap && styles.mapHidden]}
-            pointerEvents={showClubMap ? 'auto' : 'none'}>
+          <Presented
+            shown={showClubMap}
+            progress={pages.map}
+            keepMounted
+            zIndex={LAYER.map}
+            onCoveredChange={cover('map')}>
             <ClubMapScreen onClose={() => setShowClubMap(false)} />
-          </View>
+          </Presented>
         )}
 
         {/* Избранное — над нав-баром, открывается из Профиля (448:10703).
           Скрыто, пока открыта аффирмация: его FixedHeader (zIndex 10) иначе
           всплывает поверх пейджера. */}
-        {showFavorites && !favAffirmation && (
-          <View style={styles.screenSlot}>
+        {!covered.favAffirmation && (
+          <Presented
+            shown={showFavorites}
+            progress={pages.favorites}
+            zIndex={LAYER.favorites}
+            onSwipeBack={closeFavorites}
+            onCoveredChange={cover('favorites')}>
             <FavoritesScreen
-              onBack={() => {
-                setShowFavorites(false);
-                if (favoritesFromPlayerRef.current) {
-                  favoritesFromPlayerRef.current = false;
-                  reopenPlayer();
-                }
-              }}
+              onBack={closeFavorites}
               onGoPractices={() => {
                 favoritesFromPlayerRef.current = false;
                 setShowFavorites(false);
@@ -515,85 +612,99 @@ function AppContent() {
               }}
               onOpenAffirmation={setFavAffirmation}
             />
-          </View>
+          </Presented>
         )}
 
         {/* Настройки — над нав-баром, открывается из Профиля (448:10501). */}
-        {showSettings && (
-          <View style={styles.screenSlot}>
-            <SettingsScreen onBack={() => setShowSettings(false)} />
-          </View>
-        )}
+        <Presented
+          shown={showSettings}
+          progress={pages.settings}
+          zIndex={LAYER.settings}
+          onSwipeBack={() => setShowSettings(false)}
+          onCoveredChange={cover('settings')}>
+          <SettingsScreen onBack={() => setShowSettings(false)} />
+        </Presented>
 
         {/* Мини-бар «Продолжить практику» (448:11841) — под шапкой на всех
           экранах; полноэкранные оверлеи ниже по коду перекрывают его. */}
-        <MiniPlayer />
+        <View
+          pointerEvents="box-none"
+          style={[styles.screenSlot, {zIndex: LAYER.miniPlayer}]}>
+          <MiniPlayer />
+        </View>
 
         {/* Аффирмация из «Избранного» — пейджер поверх Избранного, открытый на
           сохранённой аффирмации; «назад» возвращает в Избранное. */}
-        {favAffirmation && (
-          <View style={styles.screenSlot}>
+        <Presented
+          shown={!!favAffirmation}
+          progress={pages.favAffirmation}
+          zIndex={LAYER.favAffirmation}
+          onCoveredChange={cover('favAffirmation')}>
+          {favAffirmation && (
             <AffirmationsScreen
               initial={{id: favAffirmation.id, text: favAffirmation.title}}
               onBack={() => setFavAffirmation(null)}
             />
-          </View>
-        )}
+          )}
+        </Presented>
 
         {/* Аффирмация по диплинку — пейджер поверх текущего экрана. */}
-        {linkAffirmation && (
-          <View style={styles.screenSlot}>
+        <Presented
+          shown={!!linkAffirmation}
+          kind="fade"
+          zIndex={LAYER.linkAffirmation}>
+          {linkAffirmation && (
             <AffirmationsScreen
               key={linkAffirmation}
               initial={{id: linkAffirmation}}
               onBack={() => setLinkAffirmation(null)}
             />
-          </View>
-        )}
+          )}
+        </Presented>
 
         {/* First-launch welcome — covers the whole app until dismissed. */}
-        {showWelcome && (
-          <View style={styles.screenSlot}>
-            <WelcomeScreen onStart={() => dismissWelcome()} />
-          </View>
-        )}
+        <Presented shown={!!showWelcome} kind="fade" zIndex={LAYER.welcome}>
+          <WelcomeScreen onStart={() => dismissWelcome()} />
+        </Presented>
 
         {/* Global search — above the nav bar (design 448:11117). */}
-        {showSearch && (
-          <View style={styles.screenSlot}>
-            <SearchScreen
-              onBack={() => setShowSearch(false)}
-              onOpenCategory={id => {
-                setShowSearch(false);
-                setSelectedState(null);
-                opacities.forEach((op, i) =>
-                  op.setValue(i === 2 ? VISIBLE : HIDDEN),
-                );
-                setActiveTab(2);
-                setPracticesFormat(prev => ({id, n: (prev?.n ?? 0) + 1}));
-              }}
-            />
-          </View>
-        )}
+        <Presented
+          shown={showSearch}
+          progress={pages.search}
+          zIndex={LAYER.search}
+          onSwipeBack={() => setShowSearch(false)}
+          onCoveredChange={cover('search')}>
+          <SearchScreen
+            onBack={() => setShowSearch(false)}
+            onOpenCategory={id => {
+              setShowSearch(false);
+              setSelectedState(null);
+              opacities.forEach((op, i) =>
+                op.setValue(i === 2 ? VISIBLE : HIDDEN),
+              );
+              setActiveTab(2);
+              setPracticesFormat(prev => ({id, n: (prev?.n ?? 0) + 1}));
+            }}
+          />
+        </Presented>
 
-        {/* Stories overlay sits above everything, including the nav bar. */}
-        {showStories && (
-          <View style={styles.screenSlot}>
-            <StoriesScreen
-              key={storiesOpenAt ?? 'default'}
-              content={storyContent}
-              openAt={storiesOpenAt ?? undefined}
-              onClose={() => {
-                setShowStories(false);
-                setStoriesOpenAt(null);
-              }}
-              onOpenPractices={() => {
-                setShowStories(false);
-                handleTabPress(2);
-              }}
-            />
-          </View>
-        )}
+        {/* Stories overlay sits above everything, including the nav bar.
+          Сторис — погружение, а не страница: проявляются из лёгкого зума. */}
+        <Presented shown={showStories} kind="zoom" zIndex={LAYER.stories}>
+          <StoriesScreen
+            key={storiesOpenAt ?? 'default'}
+            content={storyContent}
+            openAt={storiesOpenAt ?? undefined}
+            onClose={() => {
+              setShowStories(false);
+              setStoriesOpenAt(null);
+            }}
+            onOpenPractices={() => {
+              setShowStories(false);
+              handleTabPress(2);
+            }}
+          />
+        </Presented>
       </GradientBackground>
     </SearchContext.Provider>
   );
@@ -619,10 +730,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-  },
-  // Прогретая, но не открытая карта клубов: невидима и не ловит тапы.
-  mapHidden: {
-    opacity: 0,
   },
 });
 

@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import {Text} from '../components/Text';
+import {useScrollMemory} from '../hooks/useScrollMemory';
 import {SvgXml} from 'react-native-svg';
 import Clipboard from '@react-native-clipboard/clipboard';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -39,6 +40,7 @@ type Props = {
 export function ProfileScreen({onOpenFavorites, onOpenSettings}: Props) {
   const {bottom} = useSafeAreaInsets();
   const scrollPad = useHeaderScrollPadding();
+  const scrollMemory = useScrollMemory('profile');
   const t = useUIStrings();
   const {openSearch} = useSearch();
   function openUrl(url: string) {
@@ -97,6 +99,7 @@ export function ProfileScreen({onOpenFavorites, onOpenSettings}: Props) {
   return (
     <>
       <ScrollView
+        {...scrollMemory}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,

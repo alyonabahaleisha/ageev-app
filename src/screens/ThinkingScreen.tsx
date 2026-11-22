@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import {Text} from '../components/Text';
+import {useScrollMemory} from '../hooks/useScrollMemory';
 import {SvgXml} from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ICON_SEARCH} from '../assets/icons';
@@ -79,14 +80,23 @@ export function ThinkingScreen({resetSignal = 0, onOpenState}: Props) {
   const t = useUIStrings();
   const {openSearch} = useSearch();
 
+  const scrollMemory = useScrollMemory('thinking', scrollRef);
+
+  // Повторный тап по вкладке — наверх. При монтировании не срабатывает:
+  // вкладка возвращается на то место, где её оставили.
+  const mounted = useRef(false);
   useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     scrollRef.current?.scrollTo({y: 0, animated: true});
   }, [resetSignal]);
 
   return (
     <>
       <ScrollView
-        ref={scrollRef}
+        {...scrollMemory}
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,

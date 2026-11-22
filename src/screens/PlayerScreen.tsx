@@ -53,6 +53,10 @@ import {fonts, typography} from '../theme/typography';
 // кнопки уезжали под шторку описания.
 const MAX_FONT_SCALE = 1.3;
 
+// Свайп вниз закрывает плеер, если утянули дальше порога или «смахнули».
+const DISMISS_DISTANCE = 140;
+const DISMISS_VELOCITY = 0.9;
+
 function formatTime(seconds: number): string {
   const s = Math.floor(seconds);
   const m = Math.floor(s / 60);
@@ -865,6 +869,44 @@ export function PlayerScreen() {
   const [shareOpen, setShareOpen] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Свайп вниз за шапку или обложку закрывает плеер: экран идёт за пальцем
+  // и либо уезжает вниз, либо пружинит обратно. Прогресс-бар, кнопки и
+  // шторка «Описание» в жесте не участвуют — у них свои жесты.
+  const dragY = useRef(new Animated.Value(0)).current;
+  const dragLive = useRef({winH, closePlayer});
+  dragLive.current = {winH, closePlayer};
+  useEffect(() => {
+    if (isVisible) dragY.setValue(0);
+  }, [isVisible, dragY]);
+  const dismissPan = useRef(
+    PanResponder.create({
+      // Capture-phase: вертикальный жест вниз перехватывается, даже если
+      // начался на кнопке шапки; тапы (без движения) доходят до кнопок.
+      onMoveShouldSetPanResponderCapture: (_e, g) =>
+        g.dy > 8 && g.dy > Math.abs(g.dx) * 1.5,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_e, g) => dragY.setValue(Math.max(0, g.dy)),
+      onPanResponderRelease: (_e, g) => settleDrag(g.dy, g.vy),
+      onPanResponderTerminate: (_e, g) => settleDrag(g.dy, g.vy),
+    }),
+  ).current;
+  function settleDrag(dy: number, vy: number) {
+    if (dy > DISMISS_DISTANCE || vy > DISMISS_VELOCITY) {
+      Animated.timing(dragY, {
+        toValue: dragLive.current.winH,
+        duration: 220,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }).start(() => dragLive.current.closePlayer());
+    } else {
+      Animated.spring(dragY, {
+        toValue: 0,
+        bounciness: 4,
+        useNativeDriver: true,
+      }).start();
+    }
+  }
+
   // Таймер практики (Правки, Figma 489:11217): по клику на часы открывается
   // лист «Таймер» — практика ставится на паузу через выбранное время.
   const [timerOpen, setTimerOpen] = useState(false);
@@ -976,8 +1018,26 @@ export function PlayerScreen() {
     <Modal
       visible={isVisible}
       animationType="slide"
+      // Прозрачная модалка: пока плеер тянут вниз, под ним виден экран
+      // приложения, слегка затемнённый.
+      transparent
       statusBarTranslucent
       onRequestClose={closePlayer}>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.dragBackdrop,
+          {
+            opacity: dragY.interpolate({
+              inputRange: [0, winH],
+              outputRange: [0.4, 0],
+              extrapolate: 'clamp',
+            }),
+          },
+        ]}
+      />
+      <Animated.View
+        style={[styles.root, {transform: [{translateY: dragY}]}]}>
       <LinearGradient
         colors={['#22618D', '#347FB3', '#165079', '#165079']}
         locations={[0, 0.34, 0.68, 1]}
@@ -1000,7 +1060,9 @@ export function PlayerScreen() {
         />
 
         {/* Header */}
-        <View style={[styles.header, {paddingTop: top + 7}]}>
+        <View
+          style={[styles.header, {paddingTop: top + 7}]}
+          {...dismissPan.panHandlers}>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={closePlayer}
@@ -1038,7 +1100,10 @@ export function PlayerScreen() {
           ]}>
           {/* Cover art — flex-блок забирает всё свободное место, обложка
               вписывается в него квадратом (см. COVER_MIN/COVER_MAX). */}
-          <View style={styles.coverArea} onLayout={onCoverAreaLayout}>
+          <View
+            style={styles.coverArea}
+            onLayout={onCoverAreaLayout}
+            {...dismissPan.panHandlers}>
             <View
               style={[styles.coverGlow, {width: coverSize, height: coverSize}]}>
               <RemoteImage
@@ -1243,6 +1308,7 @@ export function PlayerScreen() {
           </View>
         )}
       </LinearGradient>
+      </Animated.View>
     </Modal>
   );
 }
@@ -1250,6 +1316,14 @@ export function PlayerScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  dragBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
   },
   bgOverlay: {
     position: 'absolute',

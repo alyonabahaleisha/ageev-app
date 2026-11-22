@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Dimensions,
-  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -18,6 +17,7 @@ import {
 import {useAppSettings} from '../services/settings';
 import {useUIStrings} from '../services/uiStrings';
 import {colors} from '../theme/colors';
+import {FlyingAngel} from './FlyingAngel';
 
 const SECTION_MARGIN = 24;
 const CARD_GAP = 12;
@@ -100,11 +100,7 @@ export function AngelHelper({onOpenState}: Props) {
       </ScrollView>
 
       {/* Angel peeking from the top-left corner, over the pill and first card */}
-      <Image
-        source={require('../assets/images/angel-7ddf76.png')}
-        style={styles.angel}
-        resizeMode="contain"
-      />
+      <FlyingAngel width={ANGEL_W} style={styles.angel} />
     </View>
   );
 }

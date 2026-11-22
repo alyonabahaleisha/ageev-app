@@ -29,8 +29,13 @@ export function headerScrollPadding(topInset: number) {
  */
 export function useHeaderScrollPadding() {
   const {top} = useSafeAreaInsets();
-  const {track, isVisible, miniDismissed} = usePlayer();
-  const miniVisible = !!track && !isVisible && !miniDismissed;
+  const {track, started, isVisible, miniDismissed} = usePlayer();
+  // Same rule MiniPlayer draws by. `started` matters: a track opened only for
+  // its description (never played) shows no bar, and reserving space for it
+  // left an empty 60px gap under every header. (An immersive screen that hides
+  // the bar for a while — `miniHidden` — deliberately does not release the
+  // space, so the screens beneath it don't jump.)
+  const miniVisible = !!track && started && !isVisible && !miniDismissed;
   return headerScrollPadding(top) + (miniVisible ? MINI_PLAYER_CLEARANCE : 0);
 }
 
