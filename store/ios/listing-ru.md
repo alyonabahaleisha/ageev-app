@@ -1,8 +1,27 @@
 # App Store listing — draft (ru)
 
-Draft prepared 2026-11-28 for review. Nothing here has been entered into
-App Store Connect. Items marked **НУЖНО ОТ ВАС** cannot be filled in without
-the account owner.
+Draft prepared 2026-11-28. Items marked **НУЖНО ОТ ВАС** cannot be filled in
+without the account owner.
+
+## Status in App Store Connect (2026-11-28)
+
+Entered and saved as drafts (app «Школа Михаила Агеева», Apple ID 6761626074):
+name (corrected from «Школа Михаила Агеев»), subtitle, both categories,
+promotional text, description, keywords, marketing URL, review notes,
+«sign-in required» off, manual release, eight screenshots, age rating,
+privacy policy URL, the four App Privacy data types, free price.
+
+Differences from this draft:
+- Age rating came out as **9+**, not 4+: «Health or Wellness Topics» = Yes.
+- Screenshots were uploaded at **1179×2556** (`screenshots/ru-1179x2556/`):
+  the slot App Store Connect offers is the medium iPhone display, which does
+  not accept 1290×2796. App Store Connect uses this set for all iPhone sizes.
+- SKU already existed: `MikhailAgeevSchool`. Version is `1.0` there; the
+  build is `1.0.0`.
+
+Not done — needs the account owner: support URL, copyright, reviewer contact,
+content rights, availability (countries), EU trader status, pressing
+**Publish** on App Privacy, uploading build 29, and **Add for Review**.
 
 ## App information
 
