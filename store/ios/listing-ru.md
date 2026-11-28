@@ -21,7 +21,8 @@ Differences from this draft:
 
 Not done — needs the account owner: support URL, copyright, reviewer contact,
 content rights, availability (countries), EU trader status, pressing
-**Publish** on App Privacy, uploading build 29, and **Add for Review**.
+**Publish** on App Privacy, uploading build 30 and attaching it, and
+**Add for Review**.
 
 ## App information
 
@@ -90,7 +91,7 @@ content rights, availability (countries), EU trader status, pressing
 **Screenshots** — `store/ios/screenshots/ru/01…08` (1290×2796), into the
 6.9-inch iPhone slot, in file-name order. No iPad set: the app is iPhone-only.
 
-**Build** — 1.0.0 (29), not yet uploaded.
+**Build** — build 29 from TestFlight (uploaded about 10 Nov 2026) is attached so the app icon shows; it is NOT the release build. The release build is 1.0.0 (30), not yet uploaded — swap it in before review.
 
 ## Age rating questionnaire
 
